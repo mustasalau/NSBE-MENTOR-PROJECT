@@ -1,5 +1,6 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import time
@@ -7,10 +8,12 @@ import openpyxl
 
 def scrape_student_organizations(url, driver_path=None):
     # Initialize WebDriver
-    if driver_path:
-        driver = webdriver.Chrome(executable_path=driver_path)
-    else:
-        driver = webdriver.Chrome()
+    options = Options()
+    options.add_argument("--headless")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1920,1080")
+ 
+    driver = webdriver.Chrome(options=options)
     driver.get(url)
 
     orgs = []
@@ -45,10 +48,14 @@ def scrape_student_organizations(url, driver_path=None):
                 prev_count = len(driver.find_elements(By.CSS_SELECTOR, ".MuiCard-root"))
                 driver.execute_script("arguments[0].click();", load_btn)
 
+                # 👇 Scroll to bottom to trigger lazy loading
+                driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                time.sleep(0.5)
+
                 WebDriverWait(driver, 15).until(
                     lambda d: len(d.find_elements(By.CSS_SELECTOR, ".MuiCard-root")) > prev_count
                 )
-                print("Clicked Load More and new cards appeared.")
+
 
             except Exception as e:
                 print(f"Load More button not found or not clickable: {e}")
