@@ -2,6 +2,9 @@
 import { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import majorsList from '../data/majors.json';
+import clubList from '/Users/msalau/NSBE-MENTOR-PROJECT/src/data/clubs.json';
+
+
 
 export default function MentorForm() {
   const [formData, setFormData] = useState({
@@ -15,7 +18,10 @@ export default function MentorForm() {
   const [errors, setErrors] = useState([]);
   const [filteredMajors, setFilteredMajors] = useState([]);
   const [majorSelected, setMajorSelected] = useState(false);
+  const [filteredOrgs, setFilteredOrgs] = useState([]);
   const nextBtnRef = useRef(null);
+  const [focusedOrgOption, setFocusedOrgOption] = useState([]);
+  const [focusedMajorIndex, setFocusedMajorIndex] = useState(-1);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -25,6 +31,8 @@ export default function MentorForm() {
       setMajorSelected(false);
       const matches = majorsList.filter((m) => m.toLowerCase().includes(value.toLowerCase()));
       setFilteredMajors(matches);
+      setFocusedMajorIndex(-1);
+
     }
 
     if (errors.length > 0) {
@@ -69,25 +77,53 @@ export default function MentorForm() {
     const updated = formData.musicalArtists.filter((_, i) => i !== index);
     setFormData((prev) => ({ ...prev, musicalArtists: updated.length > 0 ? updated : [''] }));
   };
-  const handleOrgChange = (index, value) => {
-    const updated = [...formData.organizations];
-    updated[index] = value;
-    setFormData((prev) => ({ ...prev, organizations: updated }));
-    if (errors.includes('organizations') && updated.some((o) => o.trim())) {
-      setErrors((prev) => prev.filter((e) => e !== 'organizations'));
-    }
-  };
+const handleOrgInputChange = (index, value) => {
+  const updated = [...formData.organizations];
+  updated[index] = value;
+  setFormData((prev) => ({ ...prev, organizations: updated }));
+
+  // Filter suggestions for just this index
+  const matches = clubList
+  .filter((club) => {
+    const input = value.toLowerCase();
+    const nameMatch = club.name.toLowerCase().includes(input);
+    const acronymMatch = club.acronyms?.some(acronym => acronym.toLowerCase().includes(input));
+    return nameMatch || acronymMatch;
+  })
+  .map((club) => club.name); // Return only the name for display
+  const updatedFiltered = [...filteredOrgs];
+  updatedFiltered[index] = matches;
+  setFilteredOrgs(updatedFiltered);
+  console.log("Club list sample:", clubList.slice(0, 5));
+
+};
+
+const handleSelectOrg = (index, value) => {
+  const updated = [...formData.organizations];
+  updated[index] = value;
+  setFormData((prev) => ({ ...prev, organizations: updated }));
+
+  const updatedFiltered = [...filteredOrgs];
+  updatedFiltered[index] = [];
+  setFilteredOrgs(updatedFiltered);
+};
   
-  const addOrgField = () => {
-    if (formData.organizations.at(-1).trim() === '') return;
-    setFormData((prev) => ({ ...prev, organizations: [...prev.organizations, ''] }));
-  };
-  
-  const removeOrg = (index) => {
-    const updated = formData.organizations.filter((_, i) => i !== index);
-    setFormData((prev) => ({ ...prev, organizations: updated.length > 0 ? updated : [''] }));
-  };
-  
+const addOrgField = () => {
+  if (formData.organizations.at(-1).trim() === '') return;
+  setFormData((prev) => ({ ...prev, organizations: [...prev.organizations, ''] }));
+  setFilteredOrgs((prev) => [...prev, []]);
+  setFocusedOrgOption((prev) => [...prev, -1]); // no item focused initially
+};
+
+const removeOrg = (index) => {
+  const updatedOrgs = formData.organizations.filter((_, i) => i !== index);
+  const updatedFilters = filteredOrgs.filter((_, i) => i !== index);
+  const updatedFocus = focusedOrgOption.filter((_, i) => i !== index);
+  setFormData((prev) => ({ ...prev, organizations: updatedOrgs.length > 0 ? updatedOrgs : [''] }));
+  setFilteredOrgs(updatedFilters.length > 0 ? updatedFilters : [[]]);
+  setFocusedOrgOption(updatedFocus.length > 0 ? updatedFocus : [-1]);
+};
+
   const requiredFields = {
     1: ['firstName', 'lastName', 'email', 'studentId', 'major', 'gender', 'year', 'pairGenderPreference'],
     2: ['hobbies'],
@@ -124,12 +160,22 @@ export default function MentorForm() {
       setTimeout(() => nextBtnRef.current?.classList.remove('animate-shake'), 500);
       return false;
     }
+    if (step === 4) {
+    const invalidOrgs = formData.organizations.filter(
+      (org) => !clubList.includes(org)
+    );
+    if (invalidOrgs.length > 0 && !missing.includes('organizations')) {
+      missing.push('organizations');
+    }
+}
     return true;
+    
   };
   const handleSelectMajor = (selectedMajor) => {
     setFormData((prev) => ({ ...prev, major: selectedMajor }));
     setMajorSelected(true);
     setFilteredMajors([]);
+    setFocusedMajorIndex(-1);
   };
   
   const handleNext = () => {
@@ -208,14 +254,43 @@ export default function MentorForm() {
             <input name="studentId" value={formData.studentId} onChange={handleChange} type="number" placeholder="9-Digit Student ID" className="w-full border px-4 py-2 rounded" />
 
             <div className="relative">
-              <input name="major" value={formData.major} onChange={handleChange} placeholder="Major" className="w-full border px-4 py-2 rounded" autoComplete="off" />
+              <input name="major" value={formData.major} onChange={handleChange} placeholder="Major" className="w-full border px-4 py-2 rounded" autoComplete="off" 
+              onKeyDown={(e) => {
+                  const list = filteredMajors || [];
+                  let newFocus = focusedMajorIndex;
+
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    newFocus = (newFocus + 1) % list.length;
+                    setFocusedMajorIndex(newFocus);
+                  } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    newFocus = (newFocus - 1 + list.length) % list.length;
+                    setFocusedMajorIndex(newFocus);
+                  } else if (e.key === 'Enter' && newFocus >= 0) {
+                    e.preventDefault();
+                    handleSelectMajor(list[newFocus]);
+                    setFocusedMajorIndex(-1);
+                  }
+        }}
+
+                        
+              
+              />
               {filteredMajors.length > 0 && (
                 <ul className="absolute z-10 bg-white border rounded w-full mt-1 max-h-40 overflow-y-auto shadow">
                   {filteredMajors.map((m, i) => (
-                    <li key={i} onClick={() => handleSelectMajor(m)} className="px-4 py-2 hover:bg-gray-200 cursor-pointer text-sm">
+                    <li
+                      key={i}
+                      onClick={() => handleSelectMajor(m)}
+                      className={`px-4 py-2 cursor-pointer text-sm ${
+                        focusedMajorIndex === i ? 'bg-blue-100' : 'hover:bg-gray-200'
+                      }`}
+                    >
                       {m}
                     </li>
-                  ))}
+            ))}
+
                 </ul>
               )}
             </div>
@@ -323,26 +398,77 @@ export default function MentorForm() {
   <div className="space-y-4">
     <label className="text-xl font-bold text-gray-800">Org Involvement</label>
     <div className="space-y-2">
-      {formData.organizations.map((org, index) => (
-        <div key={index} className="flex items-center gap-2">
-          <input
-            value={org}
-            onChange={(e) => handleOrgChange(index, e.target.value)}
-            placeholder="e.g., NSBE, Club Basketball, NABA"
-            className="w-full border px-4 py-2 rounded"
-          />
-          {formData.organizations.length > 1 && (
-            <button
-              type="button"
-              onClick={() => removeOrg(index)}
-              className="text-red-500 text-xl px-2 rounded hover:bg-red-100"
-              title="Remove organization"
-            >
-              ×
-            </button>
-          )}
-        </div>
-    ))}
+{formData.organizations.map((org, index) => (
+  <div key={index} className="flex items-start gap-2 relative">
+  <div className="relative w-full">
+    <input
+      value={org}
+      onChange={(e) => handleOrgInputChange(index, e.target.value)}
+      placeholder="e.g., NSBE, Club Basketball"
+      className="w-full border px-4 py-2 rounded"
+      autoComplete="off"
+      onBlur={() => {
+        setTimeout(() => {
+          const updated = [...filteredOrgs];
+          updated[index] = [];
+          setFilteredOrgs(updated);
+        }, 200);
+      }}
+      onKeyDown={(e) => {
+        const list = filteredOrgs[index] || [];
+        let newFocus = focusedOrgOption[index] ?? -1;
+
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          newFocus = (newFocus + 1) % list.length;
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          newFocus = (newFocus - 1 + list.length) % list.length;
+        } else if (e.key === 'Enter' && newFocus >= 0) {
+          e.preventDefault();
+          handleSelectOrg(index, list[newFocus]);
+          newFocus = -1;
+        }
+
+        const newFocusList = [...focusedOrgOption];
+        newFocusList[index] = newFocus;
+        setFocusedOrgOption(newFocusList);
+      }}
+    />
+
+    {/* Dropdown */}
+    {filteredOrgs[index].length > 0 && (
+      <ul className="absolute top-full left-0 z-10 bg-white border rounded w-full mt-1 max-h-40 overflow-y-auto shadow">
+        {filteredOrgs[index].map((c, i) => (
+          <li
+            key={i}
+            onClick={() => handleSelectOrg(index, c)}
+            className={`px-4 py-2 cursor-pointer text-sm ${
+              focusedOrgOption[index] === i ? 'bg-blue-100' : 'hover:bg-gray-200'
+            }`}
+          >
+            {c}
+          </li>
+        ))}
+      </ul>
+    )}
+  </div>
+
+  {/* Remove Button */}
+  {formData.organizations.length > 1 && (
+    <button
+      type="button"
+      onClick={() => removeOrg(index)}
+      className="text-red-500 text-xl px-2 rounded hover:bg-red-100"
+      title="Remove organization"
+    >
+      ×
+    </button>
+  )}
+</div>
+
+
+))}
     <button
       type="button"
       onClick={addOrgField}
