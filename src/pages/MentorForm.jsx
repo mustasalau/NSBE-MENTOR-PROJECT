@@ -1,15 +1,33 @@
 // MentorForm.jsx
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import majorsList from '../data/majors.json';
-import clubList from '/Users/msalau/NSBE-MENTOR-PROJECT/src/data/clubs.json';
+import clubList from '@/data/clubs.json';
+import Fuse from 'fuse.js';
+import hobbiesList from '@/data/hobbies.json'; // your static list of hobbies
+const DEBUG = true;
+
+const fuse = new Fuse(hobbiesList, {
+  includeScore: true,
+  threshold: 0.3, // adjust sensitivity
+  minMatchCharLength: 3, // minimum characters to start matching
+  shouldSort: true,
+
+});
+
+console.log("Hobbies list loaded:", hobbiesList);
+console.log("Fuse instance created with:", fuse.getIndex().size());
 
 
 
 export default function MentorForm() {
   const [formData, setFormData] = useState({
     firstName: '', lastName: '', email: '', personalEmail: '', studentId: '', major: '',
-    gender: '', year: '', pairGenderPreference: '', hobbies: [''], musicalArtists: [''],
+    gender: '', year: '', pairGenderPreference: '', hobbies: [{
+    raw: "",           // What the user sees
+  normalized: "",    // Backend normalized term
+  known: false         // True if matched to static list or already normalized
+}], musicalArtists: [''],
     expectations: '', meetingFrequency: '', organizations: [''], personalityWords: '',
     introExtrovert: '', idealMentee: '', menteeInMajor: '', openToMultiple: '',
   });
@@ -18,10 +36,15 @@ export default function MentorForm() {
   const [errors, setErrors] = useState([]);
   const [filteredMajors, setFilteredMajors] = useState([]);
   const [majorSelected, setMajorSelected] = useState(false);
-  const [filteredOrgs, setFilteredOrgs] = useState([]);
+  const [hobbySuggestions, setHobbySuggestions] = useState([]);
+  const [activeHobbyIndex, setActiveHobbyIndex] = useState(null);
+  const [filteredOrgs, setFilteredOrgs] = useState([[]]);
   const nextBtnRef = useRef(null);
-  const [focusedOrgOption, setFocusedOrgOption] = useState([]);
+  const [focusedOrgOption, setFocusedOrgOption] = useState([-1]);
   const [focusedMajorIndex, setFocusedMajorIndex] = useState(-1);
+  const [focusedHobbyOption, setFocusedHobbyOption] = useState(-1);
+  const [hobbiesNormalized, setHobbiesNormalized] = useState(false);
+
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -41,13 +64,36 @@ export default function MentorForm() {
   };
 
   const handleHobbyChange = (index, value) => {
-    const hobbies = [...formData.hobbies];
-    hobbies[index] = value;
-    setFormData((prev) => ({ ...prev, hobbies }));
-    if (errors.includes('hobbies') && hobbies.some((h) => h.trim())) {
-      setErrors((prev) => prev.filter((e) => e !== 'hobbies'));
-    }
+  const hobbies = [...formData.hobbies];
+  const previous = hobbies[index] || { raw: "", normalized: "", known: false };
+
+  hobbies[index] = {
+    raw: value,
+    normalized: previous.normalized && previous.normalized === value ? previous.normalized : "",
+    known: previous.normalized && previous.normalized === value ? true : false
   };
+
+  setFormData((prev) => ({ ...prev, hobbies }));
+
+  if (value.trim()) {
+    const results = fuse.search(value.trim()).map(r => r.item);
+    setHobbySuggestions(results);
+    setActiveHobbyIndex(index);
+  } else {
+    setHobbySuggestions([]);
+    setActiveHobbyIndex(null);
+  }
+
+  if (errors.includes('hobbies') && hobbies.some(h => h.raw?.trim())) {
+    setErrors((prev) => prev.filter(e => e !== 'hobbies'));
+  }
+
+  setFocusedHobbyOption(-1);
+};
+
+
+
+
 
   const handleArtistChange = (index, value) => {
     const artists = [...formData.musicalArtists];
@@ -59,13 +105,23 @@ export default function MentorForm() {
   };
 
   const addHobbyField = () => {
-    if (formData.hobbies.at(-1).trim() === '') return;
-    setFormData((prev) => ({ ...prev, hobbies: [...prev.hobbies, ''] }));
+    if (formData.hobbies.at(-1)?.raw?.trim() === '') return;
+    setFormData((prev) => ({
+  ...prev,
+  hobbies: [...prev.hobbies, { raw: "", normalized: "", known: false }]
+}));
+    setHobbySuggestions([]);
+    setActiveHobbyIndex(null);
   };
 
   const removeHobby = (index) => {
-    const updated = formData.hobbies.filter((_, i) => i !== index);
-    setFormData((prev) => ({ ...prev, hobbies: updated.length > 0 ? updated : [''] }));
+  const updated = formData.hobbies.filter((_, i) => i !== index);
+    setFormData((prev) => ({
+  ...prev,
+  hobbies: updated.length > 0 ? updated : [{ raw: "", normalized: "", known: false }]
+}));
+
+
   };
 
   const addArtistField = () => {
@@ -112,8 +168,9 @@ const addOrgField = () => {
   if (formData.organizations.at(-1).trim() === '') return;
   setFormData((prev) => ({ ...prev, organizations: [...prev.organizations, ''] }));
   setFilteredOrgs((prev) => [...prev, []]);
-  setFocusedOrgOption((prev) => [...prev, -1]); // no item focused initially
+  setFocusedOrgOption((prev) => [...prev, -1]);
 };
+
 
 const removeOrg = (index) => {
   const updatedOrgs = formData.organizations.filter((_, i) => i !== index);
@@ -123,6 +180,21 @@ const removeOrg = (index) => {
   setFilteredOrgs(updatedFilters.length > 0 ? updatedFilters : [[]]);
   setFocusedOrgOption(updatedFocus.length > 0 ? updatedFocus : [-1]);
 };
+
+
+const handleSelectSuggestion = (index, suggestion) => {
+  const hobbies = [...formData.hobbies];
+  hobbies[index] = {
+  raw: suggestion,
+  normalized: suggestion,
+  known: true
+};
+  setFormData((prev) => ({ ...prev, hobbies }));
+  setHobbySuggestions([]);
+  setActiveHobbyIndex(null);
+};
+
+
 
   const requiredFields = {
     1: ['firstName', 'lastName', 'email', 'studentId', 'major', 'gender', 'year', 'pairGenderPreference'],
@@ -138,8 +210,10 @@ const removeOrg = (index) => {
     const missing = requiredFields[step].filter((field) => {
       const val = formData[field];
       return Array.isArray(val)
-        ? val.some((v) => v.trim() === '') || val.length === 0
-        : !val;
+      ? field === 'hobbies'
+        ? val.some((h) => (h?.raw || "").trim() === "") || val.length === 0
+        : val.some((v) => v.trim() === '') || val.length === 0
+      : !val;
     });
 
     if (step === 1 && (!formData.major || !majorSelected)) {
@@ -178,22 +252,99 @@ const removeOrg = (index) => {
     setFocusedMajorIndex(-1);
   };
   
-  const handleNext = () => {
-    if (validateStep()) setStep((prev) => prev + 1);
-  };
+  const handleNext = async () => {
+  if (!validateStep()) return;
+
+  if (step === 2) {
+    const unknowns = formData.hobbies
+      .map((h, i) => ({ ...h, index: i }))
+      .filter(h => !h.known && !h.normalized);
+
+    if (unknowns.length > 0) {
+      const inputs = unknowns.map(h => h.raw);
+
+      try {
+        const response = await fetch("http://localhost:5001/normalize-hobbies", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ hobbies: inputs }),
+        });
+
+        const data = await response.json();
+        console.log("Normalized hobbies from backend:", data.normalized);
+
+        const updated = [...formData.hobbies];
+        unknowns.forEach((h, idx) => {
+          updated[h.index] = {
+            ...updated[h.index],
+            normalized: data.normalized[idx],
+            known: true
+          };
+        });
+
+        setFormData(prev => ({ ...prev, hobbies: updated }));
+      } catch (err) {
+        console.error("Error normalizing hobbies:", err);
+        return;
+      }
+    }
+  }
+
+  setStep(prev => prev + 1);
+};
+
+
+
+
+
+
 
   const handleBack = () => {
     setErrors([]);
     setStep((prev) => prev - 1);
   };
 
+  useEffect(() => {
+    if (DEBUG) {
+    console.log("Hobbies with normalized values:", formData.hobbies);
+  }
+}, [formData.hobbies]);
+
+
+
   const handleSubmit = (e) => {
-    e.preventDefault();
-    if (validateStep()) {
-      console.log(formData);
-    }
+  e.preventDefault();
+  if (!validateStep()) return;
+
+  const cleanData = {
+    ...formData,
+    hobbies: formData.hobbies.map(h => h.normalized || h.raw),
+    organizations: formData.organizations.map(org => org.trim()).filter(Boolean),
+    musicalArtists: formData.musicalArtists.map(a => a.trim()).filter(Boolean),
   };
+
+  console.log("Final Submission:", cleanData);
+
+  // Example API call (uncomment and update if needed)
+  /*
+  fetch("http://your-backend.com/submit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(cleanData),
+  })
+    .then(res => res.json())
+    .then(data => {
+      console.log("Submission successful:", data);
+    })
+    .catch(err => {
+      console.error("Submission error:", err);
+    });
+  */
+};
+
   const progressPercent = Math.round((step / 7) * 100);
+  
+
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4 py-12 relative">
       <Link to="/">
@@ -320,27 +471,88 @@ const removeOrg = (index) => {
         )}
 {step === 2 && (
   <div className="space-y-4">
-    
     <h3 className="text-xl font-semibold text-gray-800">Hobbies</h3>
-
-    <p className="font-medium text-base text-violet-500 text-center">What do you do when classes aren't beating you down?</p>
+    <p className="font-medium text-base text-violet-500 text-center">
+      What do you do when classes aren't beating you down?
+    </p>
 
     <div className="space-y-2">
-      {formData.hobbies.map((hobby, index) => (
-        <div key={index} className="flex items-center gap-2">
-          <input
-            value={hobby}
-            onChange={(e) => handleHobbyChange(index, e.target.value)}
-            placeholder="Enter Hobbies"
-            className="w-full border px-4 py-2 rounded"
-          />
-          {formData.hobbies.length > 1 && (
-            <button type="button" onClick={() => removeHobby(index)} className="text-red-500 text-xl px-2 rounded hover:bg-red-100" title="Remove hobby">
-              ×
-            </button>
+      {formData.hobbies.map((hobbyObj, index) => (
+        <div key={index} className="relative">
+          <div className="flex items-center gap-2">
+            <input
+              value={hobbyObj?.raw || ""}
+              onChange={(e) => handleHobbyChange(index, e.target.value)}
+              placeholder="Enter Hobbies"
+              className="w-full border px-4 py-2 rounded"
+              onFocus={() => {
+                const value = hobbyObj?.raw?.trim() || "";
+                if (value) {
+                  const results = fuse.search(value).map(r => r.item);
+                  setHobbySuggestions(results);
+                  setActiveHobbyIndex(index);
+                  setFocusedHobbyOption(-1);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (activeHobbyIndex !== index || hobbySuggestions.length === 0) return;
+
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setFocusedHobbyOption((prev) => (prev + 1) % hobbySuggestions.length);
+                } else if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setFocusedHobbyOption((prev) => (prev - 1 + hobbySuggestions.length) % hobbySuggestions.length);
+                } else if (e.key === "Enter" && focusedHobbyOption >= 0) {
+                  e.preventDefault();
+                  handleSelectSuggestion(index, hobbySuggestions[focusedHobbyOption]);
+                  setFocusedHobbyOption(-1);
+                }
+              }}
+            />
+
+            {formData.hobbies.length > 1 && (
+              <button
+                type="button"
+                onClick={() => removeHobby(index)}
+                className="text-red-500 text-xl px-2 rounded hover:bg-red-100"
+                title="Remove hobby"
+              >
+                ×
+              </button>
+            )}
+          </div>
+
+          {/* Autocomplete Suggestions */}
+          {activeHobbyIndex === index && (hobbyObj?.raw?.trim() || "") !== "" && (
+            <ul className="absolute z-10 bg-white border mt-1 w-full rounded shadow">
+              {hobbySuggestions.map((suggestion, sIndex) => (
+                <li
+                  key={sIndex}
+                  onClick={() => handleSelectSuggestion(index, suggestion)}
+                  className={`px-4 py-2 cursor-pointer ${
+                    focusedHobbyOption === sIndex ? "bg-blue-100" : "hover:bg-gray-100"
+                  }`}
+                >
+                  {suggestion}
+                </li>
+              ))}
+
+              <li
+                onClick={() => {
+                  handleHobbyChange(index, hobbyObj?.raw || "");
+                  setHobbySuggestions([]);
+                  setActiveHobbyIndex(null);
+                }}
+                className="px-4 py-2 text-sm text-gray-500 hover:bg-gray-50 cursor-pointer italic"
+              >
+                Keep “{hobbyObj?.raw || ""}”
+              </li>
+            </ul>
           )}
         </div>
       ))}
+
       <button
         type="button"
         onClick={addHobbyField}
@@ -352,6 +564,7 @@ const removeOrg = (index) => {
     </div>
   </div>
 )}
+
 
 {step === 3 && (
   <div className="space-y-4">
@@ -437,21 +650,22 @@ const removeOrg = (index) => {
     />
 
     {/* Dropdown */}
-    {filteredOrgs[index].length > 0 && (
-      <ul className="absolute top-full left-0 z-10 bg-white border rounded w-full mt-1 max-h-40 overflow-y-auto shadow">
-        {filteredOrgs[index].map((c, i) => (
-          <li
-            key={i}
-            onClick={() => handleSelectOrg(index, c)}
-            className={`px-4 py-2 cursor-pointer text-sm ${
-              focusedOrgOption[index] === i ? 'bg-blue-100' : 'hover:bg-gray-200'
-            }`}
-          >
-            {c}
-          </li>
-        ))}
-      </ul>
-    )}
+    {Array.isArray(filteredOrgs[index]) && filteredOrgs[index].length > 0 && (
+  <ul className="absolute top-full left-0 z-10 bg-white border rounded w-full mt-1 max-h-40 overflow-y-auto shadow">
+    {filteredOrgs[index].map((c, i) => (
+      <li
+        key={i}
+        onClick={() => handleSelectOrg(index, c)}
+        className={`px-4 py-2 cursor-pointer text-sm ${
+          focusedOrgOption[index] === i ? 'bg-blue-100' : 'hover:bg-gray-200'
+        }`}
+      >
+        {c}
+      </li>
+    ))}
+  </ul>
+)}
+
   </div>
 
   {/* Remove Button */}
@@ -536,7 +750,9 @@ const removeOrg = (index) => {
       <option>No</option>
     </select>
   </div>
+  
 )}
+
 
 <div className="flex justify-between pt-4">
   {step > 1 && (
@@ -563,3 +779,4 @@ const removeOrg = (index) => {
 </div>
 );
 } 
+
