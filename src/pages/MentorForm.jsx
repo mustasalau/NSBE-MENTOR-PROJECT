@@ -4,7 +4,9 @@ import { Link } from 'react-router-dom';
 import majorsList from '../data/majors.json';
 import clubList from '@/data/clubs.json';
 import Fuse from 'fuse.js';
-import hobbiesList from '@/data/hobbies.json'; // your static list of hobbies
+import hobbiesList from '@/data/hobbies.json'; // static list of hobbies
+import useSpotifySearch from '@/hooks/useSpotifySearch';
+
 const DEBUG = true;
 
 const fuse = new Fuse(hobbiesList, {
@@ -44,6 +46,10 @@ export default function MentorForm() {
   const [focusedMajorIndex, setFocusedMajorIndex] = useState(-1);
   const [focusedHobbyOption, setFocusedHobbyOption] = useState(-1);
   const [hobbiesNormalized, setHobbiesNormalized] = useState(false);
+  const [spotifyResults, setSpotifyResults] = useState([]);
+  const searchTimeouts = useRef([]);
+  const audioRefs = useRef([]);
+
 
 
   const handleChange = (e) => {
@@ -90,19 +96,68 @@ export default function MentorForm() {
 
   setFocusedHobbyOption(-1);
 };
-
-
-
-
-
   const handleArtistChange = (index, value) => {
-    const artists = [...formData.musicalArtists];
-    artists[index] = value;
-    setFormData((prev) => ({ ...prev, musicalArtists: artists }));
-    if (errors.includes('musicalArtists') && artists.some((a) => a.trim())) {
-      setErrors((prev) => prev.filter((e) => e !== 'musicalArtists'));
-    }
-  };
+  const updated = [...formData.musicalArtists];
+  updated[index] = value;
+  setFormData((prev) => ({ ...prev, musicalArtists: updated }));
+
+  const isClearing = !value || value.trim() === '';
+
+  setSpotifyResults((prev) => {
+    const copy = [...prev];
+    copy[index] = {
+      ...copy[index],
+      results: [],
+      loading: false,
+      selectedItem: isClearing ? null : prev[index]?.selectedItem || null,
+      previewPlaying: false
+    };
+    return copy;
+  });
+
+  if (errors.includes('musicalArtists') && updated.some((a) => a.trim())) {
+    setErrors((prev) => prev.filter((e) => e !== 'musicalArtists'));
+  }
+
+  clearTimeout(searchTimeouts.current[index]);
+
+  if (value.trim().length >= 3) {
+    setSpotifyResults((prev) => {
+      const copy = [...prev];
+      copy[index] = { 
+        results: [], 
+        loading: true, 
+        selectedItem: prev[index]?.selectedItem || null, 
+        previewPlaying: false 
+      };
+      return copy;
+    });
+
+    searchTimeouts.current[index] = setTimeout(() => {
+      fetch(`http://localhost:5002/search?query=${encodeURIComponent(value)}`)
+        .then(res => res.json())
+        .then(data => {
+          console.log("Spotify results:", data);
+
+          setSpotifyResults((prev) => {
+            const copy = [...prev];
+            copy[index] = { ...copy[index], results: data, loading: false };
+            return copy;
+          });
+        })
+        .catch(err => {
+          console.error(err);
+          setSpotifyResults((prev) => {
+            const copy = [...prev];
+            copy[index] = { ...copy[index], results: [], loading: false };
+            return copy;
+          });
+        });
+    }, 400);
+  }
+};
+
+
 
   const addHobbyField = () => {
     if (formData.hobbies.at(-1)?.raw?.trim() === '') return;
@@ -125,14 +180,19 @@ export default function MentorForm() {
   };
 
   const addArtistField = () => {
-    if (formData.musicalArtists.at(-1).trim() === '') return;
-    setFormData((prev) => ({ ...prev, musicalArtists: [...prev.musicalArtists, ''] }));
-  };
+  if (formData.musicalArtists.at(-1).trim() === '') return;
+  setFormData((prev) => ({ ...prev, musicalArtists: [...prev.musicalArtists, ''] }));
+  setSpotifyResults((prev) => [...prev, { results: [], loading: false }]);
+};
 
-  const removeArtist = (index) => {
-    const updated = formData.musicalArtists.filter((_, i) => i !== index);
-    setFormData((prev) => ({ ...prev, musicalArtists: updated.length > 0 ? updated : [''] }));
-  };
+const removeArtist = (index) => {
+  const updatedArtists = formData.musicalArtists.filter((_, i) => i !== index);
+  const updatedSpotify = spotifyResults.filter((_, i) => i !== index);
+  setFormData((prev) => ({ ...prev, musicalArtists: updatedArtists.length ? updatedArtists : [''] }));
+  setSpotifyResults(updatedSpotify.length ? updatedSpotify : [{ results: [], loading: false }]);
+};
+
+
 const handleOrgInputChange = (index, value) => {
   const updated = [...formData.organizations];
   updated[index] = value;
@@ -320,12 +380,15 @@ const handleSelectSuggestion = (index, suggestion) => {
     ...formData,
     hobbies: formData.hobbies.map(h => h.normalized || h.raw),
     organizations: formData.organizations.map(org => org.trim()).filter(Boolean),
-    musicalArtists: formData.musicalArtists.map(a => a.trim()).filter(Boolean),
+    musicalArtists: formData.musicalArtists.map((a, index) => ({
+      displayName: a.trim(),
+      genres: spotifyResults[index]?.genres || []
+    })),
   };
 
-  console.log("Final Submission:", cleanData);
+  console.log("Final Submission with genres:", cleanData);
 
-  // Example API call (uncomment and update if needed)
+  // Example API call
   /*
   fetch("http://your-backend.com/submit", {
     method: "POST",
@@ -342,8 +405,97 @@ const handleSelectSuggestion = (index, suggestion) => {
   */
 };
 
+
   const progressPercent = Math.round((step / 7) * 100);
-  
+
+
+
+
+
+const updatePreviewState = (index, isPlaying) => {
+  setSpotifyResults((prev) => {
+    const copy = [...prev];
+    copy[index] = { ...copy[index], previewPlaying: isPlaying };
+    return copy;
+  });
+};
+
+const selectSpotifyResult = (index, item) => {
+  console.log(`Selected item:`, item);
+  console.log(`Preview URL for "${item.name}":`, item.preview_url);
+
+  const displayName = `${item.name}${item.artists ? ` by ${item.artists.join(', ')}` : ''}`;
+  const updated = [...formData.musicalArtists];
+  updated[index] = displayName;
+
+  setFormData((prev) => ({ ...prev, musicalArtists: updated }));
+
+  setSpotifyResults((prev) => {
+    const copy = [...prev];
+    copy[index] = {
+      ...copy[index],
+      selectedItem: item,
+      genres: item.genres || [],  // Safely store genres
+      previewPlaying: false,
+      results: []
+    };
+    return copy;
+  });
+
+  if (item.preview_url) {
+    console.log(`Setting up preview for "${item.name}": ${item.preview_url}`);
+    console.log('genres are:' , item.genres);
+
+    try {
+      if (!audioRefs.current[index]) {
+        audioRefs.current[index] = new Audio(item.preview_url);
+      } else {
+        audioRefs.current[index].pause();
+        audioRefs.current[index].src = item.preview_url;
+      }
+    } catch (err) {
+      console.error(`Error creating audio element for "${item.name}":`, err);
+    }
+  } else {
+    console.warn(`No preview available for "${item.name}"`);
+  }
+};
+
+
+
+const togglePreview = (index) => {
+  const audio = audioRefs.current[index];
+  const selected = spotifyResults[index]?.selectedItem;
+
+  if (!selected || !selected.preview_url) {
+    console.warn(`No valid preview URL to play for index ${index}`, selected);
+    return;
+  }
+
+  if (!audio) {
+    console.warn(`Audio element not initialized for index ${index}`);
+    return;
+  }
+
+  if (spotifyResults[index]?.previewPlaying) {
+    console.log(`Pausing preview for "${selected.name}"`);
+    audio.pause();
+    updatePreviewState(index, false);
+  } else {
+    console.log(`Playing preview for "${selected.name}"`);
+    audio.play()
+      .then(() => {
+        updatePreviewState(index, true);
+        audio.onended = () => updatePreviewState(index, false);
+      })
+      .catch((err) => {
+        console.error(`Error playing preview for "${selected.name}":`, err);
+      });
+  }
+};
+
+
+
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4 py-12 relative">
@@ -564,41 +716,138 @@ const handleSelectSuggestion = (index, suggestion) => {
     </div>
   </div>
 )}
-
-
 {step === 3 && (
   <div className="space-y-4">
     <h3 className="text-xl font-semibold text-gray-800">
-    {formData.firstName.charAt(0).toUpperCase() + formData.firstName.slice(1)}'s Tunes 🎵
-      </h3>
-    <p className="font-medium text-base text-violet-500 text-center">Your on aux. Who/What are you playing?</p>
+      {formData.firstName.charAt(0).toUpperCase() + formData.firstName.slice(1)}'s Tunes 🎵
+    </h3>
+    <p className="font-medium text-base text-violet-500 text-center">You're on aux. Who/What are you playing?</p>
+
     <div className="space-y-2">
-      {formData.musicalArtists.map((artist, index) => (
-        <div key={index} className="flex items-center gap-2">
-          <input
-            value={artist}
-            onChange={(e) => handleArtistChange(index, e.target.value)}
-            placeholder="Musical Artist/Song (ex: Uzi, drive ME craxy!, etc.)"
-            className="w-full border px-4 py-2 rounded"
-          />
-          {formData.musicalArtists.length > 1 && (
-            <button type="button" onClick={() => removeArtist(index)} className="text-red-500 text-xl px-2 rounded hover:bg-red-100" title="Remove artist">
-              ×
+  {formData.musicalArtists.map((artist, index) => {
+    const selected = spotifyResults[index]?.selectedItem;
+    const showPreview = selected?.preview_url;
+    const isLoading = spotifyResults[index]?.loading;
+
+    return (
+      <div key={index} className="flex items-center w-full relative">
+
+        {/* Play button area */}
+        <div className="flex justify-center items-center w-10 h-10 mr-2 relative">
+          {showPreview && (
+            <button
+              type="button"
+              onClick={() => togglePreview(index)}
+              aria-label={spotifyResults[index]?.previewPlaying ? "Pause" : "Play"}
+              className="flex justify-center items-center w-8 h-8 bg-black rounded-full hover:bg-gray-800 shadow-sm"
+            >
+              {spotifyResults[index]?.previewPlaying ? (
+                <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current text-white">
+                  <rect x="6" y="4" width="4" height="16" />
+                  <rect x="14" y="4" width="4" height="16" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current text-white">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              )}
             </button>
           )}
         </div>
-      ))}
-      <button
-        type="button"
-        onClick={addArtistField}
-        className="text-green-600 border border-green-600 rounded-full px-3 py-1 text-lg leading-none hover:bg-green-50"
-        title="Add another artist"
-      >
-        +
-      </button>
-    </div>
+
+        {/* Input area with spinner overlay */}
+        <div className="flex-grow relative border rounded flex items-center px-2 py-1 min-h-[48px]">
+          
+          {/* Album Art */}
+          {selected?.image && (
+            <img src={selected.image} alt="cover" className="w-10 h-10 object-cover rounded mr-3" />
+          )}
+
+          {/* Text or input */}
+          {selected ? (
+            <div className="flex flex-col">
+              <span className="font-bold">{selected.name}</span>
+              <span className="text-sm text-gray-600">{selected.artists?.join(', ')}</span>
+            </div>
+          ) : (
+            <input
+              value={artist}
+              onChange={(e) => handleArtistChange(index, e.target.value)}
+              placeholder="Choose wisely..."
+              className="flex-grow outline-none"
+            />
+          )}
+
+          {/* Spinner if loading */}
+          {isLoading && (
+            <div className="absolute right-2">
+              <div className="w-5 h-5 border-2 border-gray-300 border-t-black rounded-full animate-spin"></div>
+            </div>
+          )}
+        </div>
+
+        {/* Remove button */}
+        {formData.musicalArtists.length > 1 && (
+          <button
+            type="button"
+            onClick={() => removeArtist(index)}
+            className="text-red-500 text-xl px-2 hover:bg-red-100 ml-2"
+            title="Remove artist"
+          >
+            ×
+          </button>
+        )}
+
+        {/* Suggestions Dropdown */}
+        {spotifyResults[index]?.results.length > 0 && (
+          <ul className="absolute z-20 bg-white border rounded w-full mt-1 max-h-60 overflow-y-auto shadow-lg left-0 top-full">
+            {spotifyResults[index].results.map((r, i) => (
+              <li
+                key={i}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  selectSpotifyResult(index, r);
+                }}
+                className="flex items-center gap-3 px-4 py-2 hover:bg-gray-100 cursor-pointer"
+              >
+                {r.image && (
+                  <img src={r.image} alt="cover" className="w-10 h-10 object-cover rounded" />
+                )}
+                <div className="flex flex-col">
+                  <span className="font-bold text-base">
+                    {r.name}
+                    {r.type === 'track' && ' 🎵'}
+                    {r.type === 'album' && ' 💿'}
+                    {r.type === 'artist' && ' 🎤'}
+                  </span>
+                  {r.artists && (
+                    <span className="text-sm text-gray-600">
+                      {r.artists.join(', ')}
+                    </span>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  })}
+
+  {/* Add artist button */}
+  <button
+    type="button"
+    onClick={addArtistField}
+    className="text-green-600 border border-green-600 rounded-full px-3 py-1 leading-none hover:bg-green-50"
+    title="Add another artist"
+  >
+    +
+  </button>
+</div>
+
   </div>
 )}
+
 
 {step === 4 && (
   <div className="space-y-4">
