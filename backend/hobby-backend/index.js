@@ -1,82 +1,76 @@
+// @ts-nocheck
 const express = require("express");
 const cors = require("cors");
-const fs = require("fs");  // Required for writing back to file
+const fs = require("fs");
+const path = require("path");
 
-const path = require('path');
+const { vectorizeAndSave, loadVectors } = require("./openAIhelpers.js");
+const hobbies = require(path.join(__dirname, "..", "..", "src", "data", "hobbies.json"));
+const hobbyVectorPath = path.join(__dirname, "openAI_hobby_vectors.json");
+let hobbyVectors = loadVectors(hobbyVectorPath);
 
-const { getEmbedding } = require(path.join(__dirname, 'openAIhelpers.js'));
-const hobbies = require(path.join(__dirname, '..', '..', 'src', 'data', 'hobbies.json'));
-const hobbyVectors = require(path.join(__dirname, 'openAI_hobby_vectors.json'));
-
+const traitRoutes = require("./traitRoutes.js");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use("/api/traits", traitRoutes);
 
-function cosineSimilarity(vecA, vecB) {
-  const dot = vecA.reduce((sum, a, i) => sum + a * vecB[i], 0);
-  const magA = Math.sqrt(vecA.reduce((sum, a) => sum + a * a, 0));
-  const magB = Math.sqrt(vecB.reduce((sum, b) => sum + b * b, 0));
-  return dot / (magA * magB);
+function toTitleCase(str) {
+  return str.replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-app.post("/normalize-hobbies", async (req, res) => {
+app.post("/api/hobbies/normalize", async (req, res) => {
   let userHobbies = req.body.hobbies;
   if (typeof userHobbies === "string") userHobbies = [userHobbies];
 
   if (!Array.isArray(userHobbies)) {
-    return res.status(400).json({ error: "Invalid hobbies format. Provide a string or an array of strings." });
+    return res.status(400).json({ error: "Invalid hobbies format. Provide a string or array." });
   }
 
   const results = [];
   let updated = false;
 
   for (const hobby of userHobbies) {
-    const exact = hobbies.find(h => h.toLowerCase() === hobby.toLowerCase());
-    if (exact) {
-      results.push(exact);
+    const normalized = toTitleCase(hobby.trim());
+    if (!normalized) continue;
+
+    const exists = hobbies.find(h => h.toLowerCase() === normalized.toLowerCase());
+    if (exists) {
+      results.push(exists);
       continue;
     }
 
-    const vec = await getEmbedding(hobby);
-    if (!vec) {
-      results.push(hobby);  // Fallback
-      continue;
-    }
+    if (!hobbyVectors[normalized]) {
+      console.log(`Vectorizing new hobby: "${normalized}"`);
+      const vec = await vectorizeAndSave(normalized, hobbyVectorPath, hobbyVectors, "This is a hobby or leisure activity someone might enjoy: ");
 
-    let bestMatch = null;
-    let bestScore = -1;
-
-    for (const known in hobbyVectors) {
-      const score = cosineSimilarity(vec, hobbyVectors[known]);
-      if (score > bestScore) {
-        bestScore = score;
-        bestMatch = known;
+      if (vec) {
+        hobbyVectors[normalized] = vec;
+        hobbies.push(normalized);
+        updated = true;
+        console.log(`Added "${normalized}" to hobby list and vector set.`);
+      } else {
+        console.warn(`Failed to vectorize: "${normalized}"`);
+        continue;
       }
     }
 
-    if (bestScore > 0.50) {
-      results.push(`${hobby} (${bestMatch}, ${bestScore.toFixed(2)})`);
-    } else {
-      results.push(`${hobby} (Closest: ${bestMatch}, Score: ${bestScore.toFixed(2)})`);
-    }
-
-    if (!hobbyVectors[hobby]) {
-      hobbyVectors[hobby] = vec;
-      updated = true;
-      console.log(`Added new hobby to vectors: ${hobby}`);
-    }
+    results.push(normalized);
   }
 
   if (updated) {
-  const vectorPath = path.join(__dirname, 'openAI_hobby_vectors.json');
-  
-  fs.writeFileSync(vectorPath, JSON.stringify(hobbyVectors, null, 2));
-  console.log("Hobby vector file updated.");
-}
+    fs.writeFileSync(hobbyVectorPath, JSON.stringify(hobbyVectors, null, 2));
+    fs.writeFileSync(path.join(__dirname, "..", "..", "src", "data", "hobbies.json"), JSON.stringify(hobbies, null, 2));
+    console.log("Hobby list and vector file updated.");
+  }
 
   res.json({ normalized: results });
 });
 
-const PORT = 5001;
+app.get("/api/hobbies/vectors", (req, res) => {
+  res.json(hobbyVectors);
+});
+
+const PORT = 5009;
 app.listen(PORT, () => console.log(`Hobby Backend running on port ${PORT}`));
