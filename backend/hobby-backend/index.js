@@ -1,20 +1,33 @@
 // @ts-nocheck
-const express = require("express");
-const cors = require("cors");
-const fs = require("fs");
-const path = require("path");
+import express from "express";
+import cors from "cors";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import dotenv from "dotenv";
 
-const { vectorizeAndSave, loadVectors } = require("./openAIhelpers.js");
-const hobbies = require(path.join(__dirname, "..", "..", "src", "data", "hobbies.json"));
+import { vectorizeAndSave, loadVectors } from "./openAIhelpers.js";
+import traitRoutes from "./traitRoutes.js";
+import spotifyRoutes from "./spotifyRoutes.js";
+
+dotenv.config();
+
+const app = express();
+const PORT = process.env.PORT || 5009;
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const hobbies = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "src", "data", "hobbies.json")));
 const hobbyVectorPath = path.join(__dirname, "openAI_hobby_vectors.json");
 let hobbyVectors = loadVectors(hobbyVectorPath);
 
-const traitRoutes = require("./traitRoutes.js");
-
-const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Mount your route modules
 app.use("/api/traits", traitRoutes);
+app.use("/api/spotify", spotifyRoutes);
 
 function toTitleCase(str) {
   return str.replace(/\b\w/g, (char) => char.toUpperCase());
@@ -44,7 +57,6 @@ app.post("/api/hobbies/normalize", async (req, res) => {
     if (!hobbyVectors[normalized]) {
       console.log(`Vectorizing new hobby: "${normalized}"`);
       const vec = await vectorizeAndSave(normalized, hobbyVectorPath, hobbyVectors, "This is a hobby or leisure activity someone might enjoy: ");
-
       if (vec) {
         hobbyVectors[normalized] = vec;
         hobbies.push(normalized);
@@ -55,7 +67,6 @@ app.post("/api/hobbies/normalize", async (req, res) => {
         continue;
       }
     }
-
     results.push(normalized);
   }
 
@@ -72,5 +83,4 @@ app.get("/api/hobbies/vectors", (req, res) => {
   res.json(hobbyVectors);
 });
 
-const PORT = 5009;
-app.listen(PORT, () => console.log(`Hobby Backend running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));

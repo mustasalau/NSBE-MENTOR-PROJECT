@@ -708,16 +708,33 @@ const handleTraitBlur = (index) => {
     
 
       
-
-        {step <= 7 && (
-            <h2 className="text-2xl font-bold text-center text-gray-800">
-                {role === 'mentor' 
-                    ? `Mentor Sign-Up (Step ${step} of 7)` 
-                    : `Mentee Sign-Up (Step ${step} of 7)`
-                }
-        </h2>
-
+{/* Header */}
+{step <= 7 && (
+  <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">
+    {role === 'mentor' 
+      ? `Mentor Sign-Up (Step ${step} of 7)` 
+      : `Mentee Sign-Up (Step ${step} of 7)`
+    }
+  </h2>
 )}
+
+{/* Progress Bar */}
+{step < 8 && (
+  <div className="w-full max-w-md mx-auto mb-6 px-4">
+    <div className="flex items-center justify-between mb-1">
+      <span className="text-sm text-gray-500">Progress</span>
+      <span className="text-sm text-gray-600 font-medium">{progressPercent}%</span>
+    </div>
+    <div className="w-full bg-gray-200 h-2 rounded-full">
+      <div
+        className="bg-green-500 h-2 rounded-full transition-all duration-300"
+        style={{ width: `${progressPercent}%` }}
+      ></div>
+    </div>
+  </div>
+)}
+
+        
 
         {step === 1 && (
   <div className="space-y-4">
@@ -1465,20 +1482,7 @@ const handleTraitBlur = (index) => {
   </div>
 )}
 
-{step < 8 && (
-  <div className="w-full">
-    <div className="flex items-center justify-between mb-2">
-      <span className="text-sm text-gray-500">Progress</span>
-      <span className="text-sm text-gray-600 font-medium">{progressPercent}%</span>
-    </div>
-    <div className="w-full bg-gray-200 h-2 rounded-full">
-      <div
-        className="bg-green-500 h-2 rounded-full transition-all duration-300"
-        style={{ width: `${progressPercent}%` }}
-      ></div>
-    </div>
-  </div>
-)}
+
 
 
 {step === 8 && (

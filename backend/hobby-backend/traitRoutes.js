@@ -1,12 +1,20 @@
-const express = require("express");
-const fs = require("fs");
-const path = require("path");
+import express from "express";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import { vectorizeAndSave, loadVectors } from "./openAIhelpers.js";
+
 const router = express.Router();
 
-const { vectorizeAndSave, loadVectors } = require("./openAIhelpers.js");
+// __dirname workaround in ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Paths
 const traitVectorPath = path.join(__dirname, "openAI_trait_vectors.json");
 let traitVectors = loadVectors(traitVectorPath);
 const traitsPath = path.join(__dirname, "..", "..", "src", "data", "traits.json");
+
 let staticTraits = [];
 try {
   staticTraits = JSON.parse(fs.readFileSync(traitsPath, "utf-8"));
@@ -14,6 +22,7 @@ try {
   console.warn(`No existing traits.json found. Starting fresh.`);
 }
 
+// Routes
 router.post("/add", async (req, res) => {
   const { trait } = req.body;
   if (!trait || typeof trait !== "string") {
@@ -48,9 +57,8 @@ router.post("/add", async (req, res) => {
   });
 });
 
-
 router.get("/vectors", (req, res) => {
   res.json(traitVectors);
 });
 
-module.exports = router;
+export default router;

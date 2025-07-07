@@ -1,13 +1,15 @@
-const fs = require("fs");
-const path = require("path");
-const { OpenAI } = require("openai");
-require("dotenv").config();
+import fs from "fs";
+import path from "path";
+import dotenv from "dotenv";
+import OpenAI from "openai";
+
+dotenv.config();
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-async function getEmbedding(text) {
+export async function getEmbedding(text) {
   try {
     const response = await openai.embeddings.create({
       model: "text-embedding-3-small",
@@ -20,7 +22,7 @@ async function getEmbedding(text) {
   }
 }
 
-function loadVectors(filePath) {
+export function loadVectors(filePath) {
   try {
     return JSON.parse(fs.readFileSync(filePath, "utf-8"));
   } catch {
@@ -29,7 +31,7 @@ function loadVectors(filePath) {
   }
 }
 
-async function vectorizeAndSave(term, filePath, vectors, promptPrefix = "") {
+export async function vectorizeAndSave(term, filePath, vectors, promptPrefix = "") {
   if (vectors[term]) {
     console.log(`"${term}" already vectorized.`);
     return vectors[term];
@@ -45,5 +47,3 @@ async function vectorizeAndSave(term, filePath, vectors, promptPrefix = "") {
 
   return embedding;
 }
-
-module.exports = { vectorizeAndSave, getEmbedding, loadVectors };
