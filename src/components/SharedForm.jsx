@@ -45,7 +45,9 @@ export default function SharedForm({ role, onSubmit }) {
   const progressPercent = Math.round((step / 8) * 100);
   const [showConfetti, setShowConfetti] = useState(false);
   const [showTitle, setShowTitle] = useState(false);
-const [showMessage, setShowMessage] = useState(false);
+  const [showMessage, setShowMessage] = useState(false);
+  const BASE_URL = import.meta.env.VITE_BACKEND_URL;
+
 
 
   const errorMessages = {
@@ -158,7 +160,7 @@ const [showMessage, setShowMessage] = useState(false);
 };
 
 useEffect(() => {
-  axios.get("http://localhost:5009/api/traits/vectors")
+  axios.get('${import.meta.env.VITE_BACKEND_URL}/api/traits/vectors')
     .then(res => {
       setTraitVectors(res.data);
       setTraitFuse(new Fuse(Object.keys(res.data), {
@@ -413,21 +415,7 @@ const handleBack = () => {
   console.log("==== End of Submission Data ====");
 
 
-  // Example API call
-  /*
-  fetch("http://your-backend.com/submit", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(cleanData),
-  })
-    .then(res => res.json())
-    .then(data => {
-      console.log("Submission successful:", data);
-    })
-    .catch(err => {
-      console.error("Submission error:", err);
-    });
-  */
+
 };
   const handleHobbyChange = (index, value) => {
     const hobbies = [...formData.hobbies];
@@ -488,7 +476,7 @@ const handleBack = () => {
       });
   
       searchTimeouts.current[index] = setTimeout(() => {
-        fetch(`http://localhost:5002/search?query=${encodeURIComponent(value)}`)
+        fetch(`${import.meta.env.VITE_BACKEND_URL}/api/spotify/search?query=${encodeURIComponent(value)}`)
           .then(res => res.json())
           .then(data => {
             console.log("Spotify results:", data);
@@ -582,8 +570,7 @@ const handleSelectMajor = (selectedMajor) => {
     try {
       setHobbiesLoading(true);
 
-      const res = await fetch("http://localhost:5009/api/hobbies/normalize", {
-  method: "POST",
+const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/hobbies/normalize`, {
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ hobbies: unknowns.map(h => h.text) }),
 });
@@ -593,7 +580,7 @@ const handleSelectMajor = (selectedMajor) => {
       console.log("New hobbies normalized:", data);
 
       // Reload vector list after backend updates
-      const updated = await fetch("http://localhost:5009/api/hobbies/vectors");
+      const updated = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/hobbies/vectors`);
       const vectors = await updated.json();
 
       setHobbyVectors(vectors);
@@ -625,7 +612,7 @@ const handleSelectMajor = (selectedMajor) => {
       setTraitsLoading(true);
       for (const t of pending) {
         const term = toTitleCase(t.raw?.trim());
-        const res = await axios.post("http://localhost:5009/api/traits/add", { trait: term });
+        const res = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/traits/add`, { trait: term });
         
         if (res.data.embedding) {
           console.log(`✅ "${term}" vectorized successfully.`);
@@ -1417,8 +1404,8 @@ const handleTraitBlur = (index) => {
                     if (!traitVectors[term]) if (!traitVectors[term]) {
   try {
     setTraitsLoading(true);
-    const res = await axios.post("http://localhost:5009/api/traits/add", { trait: term });
 
+    const res = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/traits/add`, { trait: term });
     if (res.data.embedding) {
       console.log(`✅ "${term}" vectorized and saved.`);
 

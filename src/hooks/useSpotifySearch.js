@@ -13,7 +13,8 @@ export default function useSpotifySearch(query) {
     const controller = new AbortController();
     const delayDebounce = setTimeout(() => {
       setLoading(true);
-      fetch(`http://localhost:5002/search?query=${encodeURIComponent(query)}`, {
+      fetch(`${import.meta.env.VITE_BACKEND_URL}/api/spotify/search?query=${encodeURIComponent(query)}`
+, {
         signal: controller.signal,
       })
         .then(res => res.json())
