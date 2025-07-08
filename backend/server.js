@@ -9,8 +9,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.post('/submit-form', async (req, res) => {
-  const data = req.body;
+app.post('/api/submit-form', async (req, res) => {  const data = req.body;
 
   try {
     await pool.query(
