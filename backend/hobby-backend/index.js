@@ -5,12 +5,20 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
+import pg from "pg";
+
 
 import { vectorizeAndSave, loadVectors } from "./openAIhelpers.js";
 import traitRoutes from "./traitRoutes.js";
 import spotifyRoutes from "./spotifyRoutes.js";
 
 dotenv.config();
+const { Pool } = pg;
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL, // Neon DB URL
+  ssl: { rejectUnauthorized: false },
+});
 
 const app = express();
 const PORT = process.env.PORT || 5009;
@@ -81,6 +89,59 @@ app.post("/api/hobbies/normalize", async (req, res) => {
 
 app.get("/api/hobbies/vectors", (req, res) => {
   res.json(hobbyVectors);
+});
+
+app.post("/api/submit", async (req, res) => {
+  const data = req.body;
+
+  try {
+    const {
+      role, firstName, lastName, email, personalEmail, studentId,
+      major, gender, year, pairGenderPreference, meetingFrequency,
+      hobbies, musicalArtists, organizations, personalityWords,
+      expectations, idealMentee, menteeInMajor, openToMultiple
+    } = data;
+
+    await pool.query(
+      `INSERT INTO mentor_mentee_submissions (
+        role, first_name, last_name, email, personal_email, student_id,
+        major, gender, year, pair_gender_preference, meeting_frequency,
+        hobbies, musical_artists, organizations, personality_words,
+        expectations, ideal_mentee, mentee_in_major, open_to_multiple
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6,
+        $7, $8, $9, $10, $11,
+        $12, $13, $14, $15,
+        $16, $17, $18, $19
+      )`,
+      [
+        role,
+        firstName,
+        lastName,
+        email,
+        personalEmail,
+        studentId,
+        major,
+        gender,
+        year,
+        pairGenderPreference,
+        meetingFrequency,
+        hobbies,
+        musicalArtists.map((m) => `${m.displayName} (${m.genres.join(', ')})`),
+        organizations,
+        personalityWords.map((p) => p.raw),
+        expectations,
+        idealMentee,
+        menteeInMajor,
+        openToMultiple
+      ]
+    );
+
+    res.status(200).json({ message: "Submission saved successfully." });
+  } catch (err) {
+    console.error("Error inserting data:", err);
+    res.status(500).json({ error: "Database insert failed." });
+  }
 });
 
 app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));

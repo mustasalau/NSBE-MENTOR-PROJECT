@@ -9,24 +9,26 @@ import { Link } from "react-router-dom";
 
 export default function SharedForm({ role, onSubmit }) {
   const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    personalEmail: "",
-    studentId: "",
-    major: "",
-    gender: "",
-    year: "",
-    pairGenderPreference: "",
-    hobbies: [""],
-    musicalArtists: [""],
-    organizations: [""],
-    personalityWords: [{ raw: "" }],
-    expectations: "",
-    idealMentee: "",
-    menteeInMajor: "",
-    openToMultiple: "",
-  });
+  firstName: "",
+  lastName: "",
+  email: "",
+  personalEmail: "",
+  studentId: "",
+  major: "",
+  gender: "",
+  year: "",
+  pairGenderPreference: "",
+  meetingFrequency: "", 
+  hobbies: [""],
+  musicalArtists: [""],
+  organizations: [""],
+  personalityWords: [{ raw: "" }],
+  expectations: "",
+  idealMentee: "",
+  menteeInMajor: "",
+  openToMultiple: "",
+});
+
 
   const [step, setStep] = useState(1);
   const [errors, setErrors] = useState([]);
@@ -393,57 +395,81 @@ export default function SharedForm({ role, onSubmit }) {
     setStep((prev) => prev - 1);
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!validateStep(step)) return;
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+  if (!validateStep(step)) return;
 
-    const cleanData = {
-      ...formData,
-      hobbies: formData.hobbies.map((h) => h.trim()).filter(Boolean),
-      organizations: formData.organizations
-        .map((org) => org.trim())
-        .filter(Boolean),
-      musicalArtists: formData.musicalArtists.map((a, index) => ({
-        displayName: a.trim(),
-        genres: spotifyResults[index]?.genres || [],
-      })),
-    };
-
-    console.log("==== Final Submission Data ====");
-    console.log("First Name:", formData.firstName);
-    console.log("Last Name:", formData.lastName);
-    console.log("PSU Email:", formData.email);
-    console.log("Personal Email:", formData.personalEmail);
-    console.log("Student ID:", formData.studentId);
-    console.log("Major:", formData.major);
-    console.log("Gender:", formData.gender);
-    console.log("Academic Year:", formData.year);
-    console.log("Mentee Gender Preference:", formData.pairGenderPreference);
-
-    console.log("\nHobbies:", cleanData.hobbies);
-    console.log("\nMusical Artists:");
-    cleanData.musicalArtists.forEach((artist, i) => {
-      console.log(
-        `  ${i + 1}: ${artist.displayName} | Genres: ${artist.genres.join(", ")}`,
-      );
-    });
-
-    console.log("\nMeeting Frequency:", formData.meetingFrequency);
-    console.log("Open to Multiple Mentees:", formData.openToMultiple);
-    console.log("Prefers Mentees in Major:", formData.menteeInMajor);
-
-    console.log("\nOrganizations:", cleanData.organizations);
-
-    console.log("\nMentorship Expectations:", formData.expectations);
-
-    console.log("\nPersonality Words:");
-    formData.personalityWords.forEach((t, i) => {
-      console.log(`  ${i + 1}: ${t.raw}`);
-    });
-
-    console.log("\nIdeal Mentee Description:", formData.idealMentee);
-    console.log("==== End of Submission Data ====");
+  const cleanData = {
+    ...formData,
+    hobbies: formData.hobbies.map((h) => h.trim()).filter(Boolean),
+    organizations: formData.organizations
+      .map((org) => org.trim())
+      .filter(Boolean),
+    musicalArtists: formData.musicalArtists.map((a, index) => ({
+      displayName: a.trim(),
+      genres: spotifyResults[index]?.genres || [],
+    })),
   };
+
+  try {
+    const response = await fetch(import.meta.env.VITE_BACKEND_URL + '/api/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...cleanData,
+        role, // assuming this is passed as a prop
+        meetingFrequency: formData.meetingFrequency,
+        personalityWords: formData.personalityWords,
+        expectations: formData.expectations,
+        idealMentee: formData.idealMentee,
+        menteeInMajor: formData.menteeInMajor,
+        openToMultiple: formData.openToMultiple,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to submit form");
+    }
+
+    console.log("✅ Submission successful!");
+  } catch (err) {
+    console.error("🚨 Submission error:", err);
+  }
+
+  // Logging (optional)
+  console.log("==== Final Submission Data ====");
+  console.log("First Name:", formData.firstName);
+  console.log("Last Name:", formData.lastName);
+  console.log("PSU Email:", formData.email);
+  console.log("Personal Email:", formData.personalEmail);
+  console.log("Student ID:", formData.studentId);
+  console.log("Major:", formData.major);
+  console.log("Gender:", formData.gender);
+  console.log("Academic Year:", formData.year);
+  console.log("Mentee Gender Preference:", formData.pairGenderPreference);
+
+  console.log("\nHobbies:", cleanData.hobbies);
+  console.log("\nMusical Artists:");
+  cleanData.musicalArtists.forEach((artist, i) => {
+    console.log(`  ${i + 1}: ${artist.displayName} | Genres: ${artist.genres.join(", ")}`);
+  });
+
+  console.log("\nMeeting Frequency:", formData.meetingFrequency);
+  console.log("Open to Multiple Mentees:", formData.openToMultiple);
+  console.log("Prefers Mentees in Major:", formData.menteeInMajor);
+
+  console.log("\nOrganizations:", cleanData.organizations);
+  console.log("\nMentorship Expectations:", formData.expectations);
+
+  console.log("\nPersonality Words:");
+  formData.personalityWords.forEach((t, i) => {
+    console.log(`  ${i + 1}: ${t.raw}`);
+  });
+
+  console.log("\nIdeal Mentee Description:", formData.idealMentee);
+  console.log("==== End of Submission Data ====");
+};
+
   const handleHobbyChange = (index, value) => {
     const hobbies = [...formData.hobbies];
     hobbies[index] = value;
