@@ -138,7 +138,7 @@ export default function SharedForm({ role, onSubmit }) {
       if (!formData.major || !majorSelected) {
         if (!missing.includes("major")) missing.push("major");
       }
-      if (formData.email && !formData.email.endsWith("@psu.edu")) {
+      if (formData.email && (!formData.email.toLowerCase().endsWith("@psu.edu"))) {
         if (!missing.includes("email")) missing.push("email");
       }
       if (!/^\d{9}$/.test(formData.studentId)) {
@@ -1590,7 +1590,7 @@ export default function SharedForm({ role, onSubmit }) {
           </p>
           <textarea
             name="idealMatchDescription"
-            value={formData.idealMentee}
+            value={formData.idealMatchDescription}
             onChange={handleChange}
             placeholder="My twin 🤪"
             className={`w-full border px-4 py-2 rounded mt-4 ${errors.includes("idealMatchDescription") ? "border-red-500" : ""

@@ -101,7 +101,7 @@ app.post("/api/submit", async (req, res) => {
       role, firstName, lastName, email, personalEmail, studentId,
       major, gender, year, pairGenderPreference, meetingFrequency,
       hobbies, musicalArtists, organizations, personalityWords,
-      expectations, ideal_match_description, menteeInMajor, openToMultiple
+      expectations, idealMatchDescription, menteeInMajor, openToMultiple
     } = data;
 
     await pool.query(
@@ -133,7 +133,7 @@ app.post("/api/submit", async (req, res) => {
         organizations,
         personalityWords.map((p) => p.raw),
         expectations,
-        ideal_match_description,
+        idealMatchDescription,
         menteeInMajor,
         openToMultiple
       ]
