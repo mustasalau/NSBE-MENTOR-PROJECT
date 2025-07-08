@@ -24,7 +24,7 @@ export default function SharedForm({ role, onSubmit }) {
   organizations: [""],
   personalityWords: [{ raw: "" }],
   expectations: "",
-  idealMentee: "",
+  idealMatchDescription: "",
   menteeInMajor: "",
   openToMultiple: "",
 });
@@ -76,8 +76,12 @@ export default function SharedForm({ role, onSubmit }) {
     openToMultiple: "Please indicate if you are open to mentoring two mentees.",
     expectations: "Please describe your mentorship style.",
     personalityWords: "Please describe yourself in 3 words.",
-    idealMentee: "Please describe your ideal mentee.",
-    menteeInMajor: "Please indicate if you prefer mentees in your major.",
+    idealMatchDescription: role === "mentor"
+    ? "Please describe your ideal mentee."
+    : "Please describe your ideal mentor.",
+    menteeInMajor: role === "mentor" 
+    ? "Please indicate if you prefer mentees in your major."
+    : "Please indicate if you are looking for a mentor in your major.",
   };
 
   const requiredFields = {
@@ -99,7 +103,7 @@ export default function SharedForm({ role, onSubmit }) {
         : ["meetingFrequency", "menteeInMajor"],
     5: ["organizations"],
     6: ["expectations"],
-    7: ["personalityWords", "idealMentee"],
+    7: ["personalityWords", "idealMatchDescription"],
   };
 
   const validateStep = (stepToValidate) => {
@@ -421,7 +425,7 @@ export default function SharedForm({ role, onSubmit }) {
         meetingFrequency: formData.meetingFrequency,
         personalityWords: formData.personalityWords,
         expectations: formData.expectations,
-        idealMentee: formData.idealMentee,
+        idealMatchDescription: formData.idealMatchDescription,
         menteeInMajor: formData.menteeInMajor,
         openToMultiple: formData.openToMultiple,
       }),
@@ -466,7 +470,7 @@ export default function SharedForm({ role, onSubmit }) {
     console.log(`  ${i + 1}: ${t.raw}`);
   });
 
-  console.log("\nIdeal Mentee Description:", formData.idealMentee);
+  console.log("\nIdeal Mentee/Mentor Description:", formData.idealMatchDescription);
   console.log("==== End of Submission Data ====");
 };
 
@@ -1585,11 +1589,11 @@ export default function SharedForm({ role, onSubmit }) {
               : `Describe your ideal mentor in a few words.`}
           </p>
           <textarea
-            name="idealMentee"
+            name="idealMatchDescription"
             value={formData.idealMentee}
             onChange={handleChange}
             placeholder="My twin 🤪"
-            className={`w-full border px-4 py-2 rounded mt-4 ${errors.includes("idealMentee") ? "border-red-500" : ""
+            className={`w-full border px-4 py-2 rounded mt-4 ${errors.includes("idealMatchDescription") ? "border-red-500" : ""
               }`}
             rows="3"
           />
