@@ -417,8 +417,8 @@ function createMemoryHistory(options = {}) {
     },
     createHref: createHref2,
     createURL(to) {
-      return new URL(createHref2(to), "http://localhost");
-    },
+  return new URL(createHref2(to), window.location.origin);
+},
     encodeLocation(to) {
       let path = typeof to === "string" ? parsePath(to) : to;
       return {
@@ -691,18 +691,24 @@ function getUrlBasedHistory(getLocation, createHref2, validateLocation, options 
   return history;
 }
 function createBrowserURLImpl(to, isAbsolute = false) {
-  let base = "http://localhost";
+  let base;
+
   if (typeof window !== "undefined") {
-    base = window.location.origin !== "null" ? window.location.origin : window.location.href;
+    base = window.location.origin || window.location.href;
+  } else {
+    throw new Error("Cannot create browser URL outside of the browser environment");
   }
-  invariant(base, "No window.location.(origin|href) available to create URL");
+
   let href2 = typeof to === "string" ? to : createPath(to);
   href2 = href2.replace(/ $/, "%20");
+
   if (!isAbsolute && href2.startsWith("//")) {
     href2 = base + href2;
   }
+
   return new URL(href2, base);
 }
+
 function unstable_createContext(defaultValue) {
   return { defaultValue };
 }
@@ -10140,13 +10146,23 @@ function createHref(to) {
 function encodeLocation(to) {
   let href2 = typeof to === "string" ? to : createPath(to);
   href2 = href2.replace(/ $/, "%20");
-  let encoded = ABSOLUTE_URL_REGEX3.test(href2) ? new URL(href2) : new URL(href2, "http://localhost");
+
+  const base =
+    typeof window !== "undefined"
+      ? window.location.origin || window.location.href
+      : "https://nsbe-mentor-project.vercel.app"; // optional fallback for SSR (or throw)
+
+  const encoded = ABSOLUTE_URL_REGEX3.test(href2)
+    ? new URL(href2)
+    : new URL(href2, base);
+
   return {
     pathname: encoded.pathname,
     search: encoded.search,
     hash: encoded.hash
   };
 }
+
 var ABSOLUTE_URL_REGEX3 = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
 var ESCAPE_LOOKUP2 = {
   "&": "\\u0026",
