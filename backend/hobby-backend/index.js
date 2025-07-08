@@ -90,7 +90,9 @@ app.post("/api/hobbies/normalize", async (req, res) => {
 app.get("/api/hobbies/vectors", (req, res) => {
   res.json(hobbyVectors);
 });
-
+app.get('/ping', (req, res) => {
+  res.send('pong');
+});
 app.post("/api/submit", async (req, res) => {
   const data = req.body;
 
