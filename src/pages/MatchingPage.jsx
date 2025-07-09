@@ -23,25 +23,21 @@ export default function MatchingPage({ onLogin }) {
       { password }
     );
 
-    if (res.data.success) {
-      const check = await axiosInstance.get(
-        "https://nsbe-mentor-project.onrender.com/api/check"
-      );
+    // Handle 401 response clearly
+    if (res.status === 401) {
+      setError("Incorrect password");
+    } else if (res.status === 200 && res.data.success) {
+      const check = await axiosInstance.get("https://nsbe-mentor-project.onrender.com/api/check");
       if (check.data.loggedIn) {
         onLogin();
       } else {
         setError("Login succeeded but check failed.");
       }
     } else {
-      setError("Incorrect password");
+      setError("Unexpected response");
     }
   } catch (err) {
-    if (err.response?.status === 401) {
-      setError("Incorrect password");
-    } else {
-      setError("Server error");
-    }
-
+    setError("Server error (connection issue or crash)");
     console.error("Login error:", {
       message: err.message,
       code: err.code,
@@ -52,6 +48,7 @@ export default function MatchingPage({ onLogin }) {
     setLoading(false);
   }
 };
+
 
 
   return (

@@ -11,11 +11,11 @@
 
 .dot-flash::after {
   content: ".";
-  animation: dots 2s steps(4, end) infinite;
+  animation: dots 1s steps(4, end) infinite;
 }
 
 .dot {
-  animation: bounce 2s infinite;
+  animation: bounce 1s infinite;
   display: inline-block;
 }
 
