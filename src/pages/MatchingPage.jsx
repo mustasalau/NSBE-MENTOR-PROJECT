@@ -39,22 +39,33 @@ export default function MatchingPage({ onLogin }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="p-8 space-y-4">
-      <input
-        type="password"
-        placeholder="Enter password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        className="border p-2 w-full"
-      />
-      <button
-        type="submit"
-        className="bg-black text-white px-4 py-2"
-        disabled={loading}
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-800 to-black">
+      <form
+        onSubmit={handleSubmit}
+        className="bg-[#1f1f1f] text-white p-8 rounded-xl shadow-lg w-full max-w-sm space-y-4"
       >
-        {loading ? "Logging in..." : "Login"}
-      </button>
-      {error && <p className="text-red-500">{error}</p>}
-    </form>
+        <h2 className="text-center text-2xl font-semibold">Login</h2>
+
+        <input
+          type="password"
+          placeholder="Enter password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="w-full p-3 rounded bg-gray-900 text-white placeholder-gray-400 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
+        />
+
+        {error && <p className="text-red-500 text-center">{error}</p>}
+
+        <div className="flex justify-center">
+          <button
+            type="submit"
+            disabled={loading}
+            className="bg-gray-700 hover:bg-gray-600 text-white font-medium px-6 py-2 rounded transition"
+          >
+            {loading ? "Logging in..." : "Login"}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
