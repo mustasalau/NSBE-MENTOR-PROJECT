@@ -1,4 +1,3 @@
-// @ts-nocheck
 import express from "express";
 import cors from "cors";
 import fs from "fs";
@@ -6,7 +5,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import pg from "pg";
-
+import cookieParser from "cookie-parser";
 
 import { vectorizeAndSave, loadVectors } from "./openAIhelpers.js";
 import traitRoutes from "./traitRoutes.js";
@@ -14,15 +13,13 @@ import spotifyRoutes from "./spotifyRoutes.js";
 
 dotenv.config();
 const { Pool } = pg;
-
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL, // Neon DB URL
+  connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 });
 
 const app = express();
 const PORT = process.env.PORT || 5009;
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -30,16 +27,52 @@ const hobbies = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "src
 const hobbyVectorPath = path.join(__dirname, "openAI_hobby_vectors.json");
 let hobbyVectors = loadVectors(hobbyVectorPath);
 
-app.use(cors());
+app.use(cors({
+  origin: "https://nsbe-mentor-project.vercel.app", // no trailing slash!
+  credentials: true
+}));
 app.use(express.json());
+app.use(cookieParser());
 
-// Mount your route modules
 app.use("/api/traits", traitRoutes);
 app.use("/api/spotify", spotifyRoutes);
 
-function toTitleCase(str) {
-  return str.replace(/\b\w/g, (char) => char.toUpperCase());
+// === AUTH LOGIC ===
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+
+function requireLogin(req, res, next) {
+  if (req.cookies.loggedIn === "true") {
+    return next();
+  } else {
+    return res.status(401).json({ error: "Not logged in" });
+  }
 }
+
+app.post("/api/login", (req, res) => {
+  const { password } = req.body;
+
+  if (password === ADMIN_PASSWORD) {
+    res.cookie("loggedIn", "true", {
+      httpOnly: true,
+      sameSite: "None",
+      secure: true,
+      maxAge: 24 * 60 * 60 * 1000
+    });
+    return res.json({ success: true });
+  } else {
+    return res.status(401).json({ success: false });
+  }
+});
+
+app.get("/api/check", (req, res) => {
+  if (req.cookies.loggedIn === "true") {
+    res.json({ loggedIn: true });
+  } else {
+    res.status(403).json({ loggedIn: false });
+  }
+});
+
+// === END AUTH ===
 
 app.post("/api/hobbies/normalize", async (req, res) => {
   let userHobbies = req.body.hobbies;
@@ -53,7 +86,7 @@ app.post("/api/hobbies/normalize", async (req, res) => {
   let updated = false;
 
   for (const hobby of userHobbies) {
-    const normalized = toTitleCase(hobby.trim());
+    const normalized = hobby.trim().replace(/\b\w/g, (c) => c.toUpperCase());
     if (!normalized) continue;
 
     const exists = hobbies.find(h => h.toLowerCase() === normalized.toLowerCase());
@@ -90,10 +123,12 @@ app.post("/api/hobbies/normalize", async (req, res) => {
 app.get("/api/hobbies/vectors", (req, res) => {
   res.json(hobbyVectors);
 });
-app.get('/ping', (req, res) => {
-  res.send('pong');
+
+app.get("/ping", (req, res) => {
+  res.send("pong");
 });
-app.post("/api/submit", async (req, res) => {
+
+app.post("/api/submit", requireLogin, async (req, res) => {
   const data = req.body;
 
   try {

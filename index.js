@@ -34,7 +34,6 @@ async function getSpotifyToken() {
   return token;
 }
 
-// Endpoint: /search-song?q=drake
 app.get('/search-song', async (req, res) => {
   try {
     const q = req.query.q;
