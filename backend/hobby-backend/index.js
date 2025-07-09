@@ -128,8 +128,11 @@ app.get("/api/hobbies/vectors", (req, res) => {
   res.json(hobbyVectors);
 });
 
-app.get("/ping", (req, res) => {
-  res.send("pong");
+app.get("/api/test", (req, res) => {
+  res.json({ 
+    adminPasswordExists: !!process.env.ADMIN_PASSWORD,
+    adminPasswordLength: process.env.ADMIN_PASSWORD?.length || 0
+  });
 });
 
 app.post("/api/submit", requireLogin, async (req, res) => {
