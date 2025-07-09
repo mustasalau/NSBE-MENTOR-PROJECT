@@ -23,36 +23,17 @@ const handleSubmit = async (e) => {
       { password },
       {
         withCredentials: true,
-        validateStatus: () => true // ✅ Allow all status codes (including 401)
+        validateStatus: () => true
       }
     );
 
     if (res.status === 401) {
       setError("Incorrect password");
     } else if (res.status === 200 && res.data.success) {
-      const check = await axios.get(
-        "https://nsbe-mentor-project.onrender.com/api/check",
-        {
-          withCredentials: true,
-          validateStatus: () => true // optional but safe
-        }
-      );
-      if (check.data.loggedIn) {
-        onLogin();
-      } else {
-        setError("Login succeeded but check failed.");
-      }
-    } else {
-      setError("Unexpected error. Please try again.");
+      // Continue with your check logic...
     }
   } catch (err) {
     setError("Server error");
-    console.error("Login error:", {
-      message: err.message,
-      code: err.code,
-      response: err.response?.status,
-      data: err.response?.data
-    });
   } finally {
     setLoading(false);
   }
