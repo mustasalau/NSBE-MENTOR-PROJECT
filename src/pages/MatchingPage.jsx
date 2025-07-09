@@ -34,7 +34,12 @@ export default function MatchingPage({ onLogin }) {
       }
     } catch (err) {
       setError("Server error");
-      console.error("Login error:", err);
+      console.error("Login error:", {
+  message: err.message,
+  code: err.code,
+  response: err.response?.status,
+  data: err.response?.data
+});
 
     } finally {
       setLoading(false);
