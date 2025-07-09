@@ -18,6 +18,8 @@ const handleSubmit = async (e) => {
   setError("");
 
   try {
+    console.log("Making request...");
+    
     const res = await axios.post(
       "https://nsbe-mentor-project.onrender.com/api/login",
       { password },
@@ -27,18 +29,31 @@ const handleSubmit = async (e) => {
       }
     );
 
+    console.log("Response received:", res.status, res.data);
+
     if (res.status === 401) {
+      console.log("Setting error: Incorrect password");
       setError("Incorrect password");
     } else if (res.status === 200 && res.data.success) {
+      console.log("Login successful, checking auth...");
       // Continue with your check logic...
+    } else {
+      console.log("Unexpected response:", res.status, res.data);
+      setError("Unexpected error. Please try again.");
     }
   } catch (err) {
+    console.error("Caught error:", err);
+    console.error("Error details:", {
+      message: err.message,
+      code: err.code,
+      response: err.response?.status,
+      data: err.response?.data
+    });
     setError("Server error");
   } finally {
     setLoading(false);
   }
 };
-
 
 
 
