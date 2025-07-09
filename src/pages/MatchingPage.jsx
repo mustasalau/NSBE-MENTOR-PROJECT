@@ -16,7 +16,10 @@ export default function MatchingPage({ onLogin }) {
       const res = await axios.post(
         "https://nsbe-mentor-project.onrender.com/api/login",
         { password },
-        { withCredentials: true }
+         {
+    withCredentials: true,
+    validateStatus: (status) => status < 500 // ✅ Accept 401, 403, etc. without throwing
+  }
       );
 
       if (res.data.success) {
