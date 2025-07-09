@@ -7,47 +7,52 @@ export default function MatchingPage({ onLogin }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-
-    try {
-      const res = await axios.post(
-          "https://nsbe-mentor-project.onrender.com/api/login",
-          { password }, // body
-          {
-            withCredentials: true,
-            validateStatus: (status) => status < 500
-          }
-      );
-
-      if (res.data.success) {
-        const check = await axios.get(
-          "https://nsbe-mentor-project.onrender.com/api/check",
-          { withCredentials: true }
-        );
-        if (check.data.loggedIn) {
-          onLogin();
-        } else {
-          setError("Login succeeded but check failed.");
-        }
-      } else {
-        setError("Incorrect password");
-      }
-    } catch (err) {
-      setError("Server error");
-      console.error("Login error:", {
-  message: err.message,
-  code: err.code,
-  response: err.response?.status,
-  data: err.response?.data
+  const axiosInstance = axios.create({
+  withCredentials: true,
+  validateStatus: (status) => status < 500
 });
 
-    } finally {
-      setLoading(false);
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+  setError("");
+
+  try {
+    const res = await axiosInstance.post(
+      "https://nsbe-mentor-project.onrender.com/api/login",
+      { password }
+    );
+
+    if (res.data.success) {
+      const check = await axiosInstance.get(
+        "https://nsbe-mentor-project.onrender.com/api/check"
+      );
+      if (check.data.loggedIn) {
+        onLogin();
+      } else {
+        setError("Login succeeded but check failed.");
+      }
+    } else {
+      setError("Incorrect password");
     }
-  };
+  } catch (err) {
+    if (err.response?.status === 401) {
+      setError("Incorrect password");
+    } else {
+      setError("Server error");
+    }
+
+    console.error("Login error:", {
+      message: err.message,
+      code: err.code,
+      response: err.response?.status,
+      data: err.response?.data
+    });
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-800 to-black flex items-center justify-center relative px-4">
