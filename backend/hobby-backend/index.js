@@ -28,7 +28,12 @@ const hobbyVectorPath = path.join(__dirname, "openAI_hobby_vectors.json");
 let hobbyVectors = loadVectors(hobbyVectorPath);
 
 app.use(cors({
-  origin: "https://nsbe-mentor-project.vercel.app", // no trailing slash!
+  origin: [
+    'https://nsbe-mentor-project.vercel.app',  // Production
+    'http://localhost:5174',                   // Local development
+    'http://localhost:3000',                   // Common React dev port
+    'http://localhost:5173'                    // Another common Vite port
+  ],
   credentials: true
 }));
 app.use(express.json());
