@@ -12,32 +12,41 @@ export default function MatchingPage({ onLogin }) {
   validateStatus: (status) => status < 500
 });
 
-  const handleSubmit = async (e) => {
+const handleSubmit = async (e) => {
   e.preventDefault();
   setLoading(true);
   setError("");
 
   try {
-    const res = await axiosInstance.post(
+    const res = await axios.post(
       "https://nsbe-mentor-project.onrender.com/api/login",
-      { password }
+      { password },
+      {
+        withCredentials: true,
+        validateStatus: () => true // ✅ Allow all status codes (including 401)
+      }
     );
 
-    // Handle 401 response clearly
     if (res.status === 401) {
       setError("Incorrect password");
     } else if (res.status === 200 && res.data.success) {
-      const check = await axiosInstance.get("https://nsbe-mentor-project.onrender.com/api/check");
+      const check = await axios.get(
+        "https://nsbe-mentor-project.onrender.com/api/check",
+        {
+          withCredentials: true,
+          validateStatus: () => true // optional but safe
+        }
+      );
       if (check.data.loggedIn) {
         onLogin();
       } else {
         setError("Login succeeded but check failed.");
       }
     } else {
-      setError("Unexpected response");
+      setError("Unexpected error. Please try again.");
     }
   } catch (err) {
-    setError("Server error (connection issue or crash)");
+    setError("Server error");
     console.error("Login error:", {
       message: err.message,
       code: err.code,
@@ -48,6 +57,7 @@ export default function MatchingPage({ onLogin }) {
     setLoading(false);
   }
 };
+
 
 
 
