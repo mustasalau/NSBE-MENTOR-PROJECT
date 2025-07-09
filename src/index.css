@@ -1,3 +1,24 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@keyframes dots {
+  0%   { content: "."; }
+  33%  { content: ".."; }
+  66%  { content: "..."; }
+  100% { content: " "; }
+}
+
+.dot-flash::after {
+  content: ".";
+  animation: dots 2s steps(4, end) infinite;
+}
+
+.dot {
+  animation: bounce 2s infinite;
+  display: inline-block;
+}
+
+.delay-0 { animation-delay: 0s; }
+.delay-100 { animation-delay: 0.15s; }
+.delay-200 { animation-delay: 0.3s; }

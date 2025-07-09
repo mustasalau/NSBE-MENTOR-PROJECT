@@ -58,7 +58,12 @@ export default function MatchingPage({ onLogin }) {
           type="password"
           placeholder="Enter password"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(e) => {setPassword(e.target.value)
+          if (error) setError("");
+
+          }
+        }
+          
           className="w-64 p-3 rounded bg-gray-900 text-white placeholder-gray-400 border border-gray-700 shadow-2xl focus:outline-none focus:ring-2 focus:ring-gray-500"
         />
 
@@ -69,8 +74,19 @@ export default function MatchingPage({ onLogin }) {
           disabled={loading}
           className="bg-gray-700 hover:bg-gray-600 text-white font-medium px-6 py-2 rounded shadow-2xl transition mx-auto"
         >
-          {loading ? "Logging in..." : "Login"}
-        </button>
+          {loading ? (
+    <span className="flex items-center space-x-1">
+  <span>Logging in</span>
+  <span className="flex space-x-1">
+    <span className="animate-bounce dot delay-0">.</span>
+    <span className="animate-bounce dot delay-100">.</span>
+    <span className="animate-bounce dot delay-200">.</span>
+  </span>
+</span>
+  ) : (
+    "Login"
+  )}
+</button>
       </form>
     </div>
   );
