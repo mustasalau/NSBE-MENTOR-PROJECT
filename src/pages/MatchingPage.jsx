@@ -14,12 +14,12 @@ export default function MatchingPage({ onLogin }) {
 
     try {
       const res = await axios.post(
-        "https://nsbe-mentor-project.onrender.com/api/login",
-        { password },
-         {
-    withCredentials: true,
-    validateStatus: (status) => status < 500 // ✅ Accept 401, 403, etc. without throwing
-  }
+          "https://nsbe-mentor-project.onrender.com/api/login",
+          { password }, // body
+          {
+            withCredentials: true,
+            validateStatus: (status) => status < 500
+          }
       );
 
       if (res.data.success) {

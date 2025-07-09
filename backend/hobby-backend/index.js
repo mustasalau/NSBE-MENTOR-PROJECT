@@ -51,6 +51,9 @@ function requireLogin(req, res, next) {
 app.post("/api/login", (req, res) => {
   const { password } = req.body;
 
+  console.log("Login attempt with password:", password);
+  console.log("Expected password:", ADMIN_PASSWORD);
+
   if (password === ADMIN_PASSWORD) {
     res.cookie("loggedIn", "true", {
       httpOnly: true,
@@ -63,6 +66,7 @@ app.post("/api/login", (req, res) => {
     return res.status(401).json({ success: false });
   }
 });
+
 
 app.get("/api/check", (req, res) => {
   if (req.cookies.loggedIn === "true") {
