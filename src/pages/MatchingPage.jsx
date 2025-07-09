@@ -1,5 +1,6 @@
 import { useState } from "react";
 import axios from "axios";
+import { Link } from "react-router-dom";
 
 export default function MatchingPage({ onLogin }) {
   const [password, setPassword] = useState("");
@@ -24,7 +25,7 @@ export default function MatchingPage({ onLogin }) {
           { withCredentials: true }
         );
         if (check.data.loggedIn) {
-          onLogin(); // success
+          onLogin();
         } else {
           setError("Login succeeded but check failed.");
         }
@@ -39,32 +40,37 @@ export default function MatchingPage({ onLogin }) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-800 to-black">
+    <div className="min-h-screen bg-gradient-to-br from-gray-800 to-black flex items-center justify-center relative px-4">
+      {/* Logo in top-left corner */}
+      <Link to="/">
+        <img
+          src="/pictures/nsbelogo.png"
+          alt="NSBE Logo"
+          className="absolute top-4 left-4 w-16 h-auto cursor-pointer"
+        />
+      </Link>
+
       <form
         onSubmit={handleSubmit}
-        className="bg-[#1f1f1f] text-white p-8 rounded-xl shadow-lg w-full max-w-sm space-y-4"
+        className="w-full max-w-sm space-y-6 flex flex-col items-center"
       >
-        <h2 className="text-center text-2xl font-semibold">Login</h2>
-
         <input
           type="password"
           placeholder="Enter password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full p-3 rounded bg-gray-900 text-white placeholder-gray-400 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
+          className="w-64 p-3 rounded bg-gray-900 text-white placeholder-gray-400 border border-gray-700 shadow-2xl focus:outline-none focus:ring-2 focus:ring-gray-500"
         />
 
-        {error && <p className="text-red-500 text-center">{error}</p>}
+        {error && <p className="text-red-500 text-center text-sm">{error}</p>}
 
-        <div className="flex justify-center">
-          <button
-            type="submit"
-            disabled={loading}
-            className="bg-gray-700 hover:bg-gray-600 text-white font-medium px-6 py-2 rounded transition"
-          >
-            {loading ? "Logging in..." : "Login"}
-          </button>
-        </div>
+        <button
+          type="submit"
+          disabled={loading}
+          className="bg-gray-700 hover:bg-gray-600 text-white font-medium px-6 py-2 rounded shadow-2xl transition mx-auto"
+        >
+          {loading ? "Logging in..." : "Login"}
+        </button>
       </form>
     </div>
   );
