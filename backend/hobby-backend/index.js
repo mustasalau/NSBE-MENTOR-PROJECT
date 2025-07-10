@@ -191,7 +191,7 @@ app.post("/api/submit", async (req, res) => {
   }
 });
 
-router.post("/save-match-settings", async (req, res) => {
+app.post("/save-match-settings", async (req, res) => {
   const {
     major,
     gender,
@@ -258,7 +258,7 @@ router.post("/save-match-settings", async (req, res) => {
   }
 });
 
-router.get("/get-match-settings", async (req, res) => {
+app.get("/get-match-settings", async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM match_settings LIMIT 1");
 
