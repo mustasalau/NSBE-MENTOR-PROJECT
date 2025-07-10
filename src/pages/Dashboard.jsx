@@ -214,34 +214,39 @@ useEffect(() => {
   return (
   <div className="min-h-screen bg-blue-50 relative p-6">
     <a href="/">
-      <img src="/pictures/nsbelogo.png" alt="NSBE Logo" className="absolute top-4 left-4 w-16 cursor-pointer" />
+      <img
+        src="/pictures/nsbelogo.png"
+        alt="NSBE Logo"
+        className="absolute top-4 left-4 w-16 cursor-pointer"
+      />
     </a>
 
     <div className="max-w-5xl mx-auto mt-20 p-8 bg-white rounded-3xl shadow-xl">
-     <div className="flex space-x-4 mb-4">
-  <button
-    onClick={() => setView("dashboard")}
-    className={`text-xs font-medium px-3 py-1 rounded-full transition ${
-      view === "dashboard"
-        ? "bg-blue-100 text-blue-700"
-        : "text-gray-400 hover:bg-gray-100"
-    }`}
-  >
-    Dashboard
-  </button>
-  <button
-    onClick={() => setView("Match Settings")}
-    className={`text-xs font-medium px-3 py-1 rounded-full transition ${
-      view === "Match Settings"
-        ? "bg-blue-100 text-blue-700"
-        : "text-gray-400 hover:bg-gray-100"
-    }`}
-  >
-    Match Settings
-  </button>
-</div>
+      {/* Nav Buttons */}
+      <div className="flex space-x-4 mb-4">
+        <button
+          onClick={() => setView("dashboard")}
+          className={`text-xs font-medium px-3 py-1 rounded-full transition ${
+            view === "dashboard"
+              ? "bg-blue-100 text-blue-700"
+              : "text-gray-400 hover:bg-gray-100"
+          }`}
+        >
+          Dashboard
+        </button>
+        <button
+          onClick={() => setView("Match Settings")}
+          className={`text-xs font-medium px-3 py-1 rounded-full transition ${
+            view === "Match Settings"
+              ? "bg-blue-100 text-blue-700"
+              : "text-gray-400 hover:bg-gray-100"
+          }`}
+        >
+          Match Settings
+        </button>
+      </div>
 
-
+      {/* Dashboard View */}
       {view === "dashboard" && (
         <>
           <h1 className="text-3xl font-bold text-center">Dashboard</h1>
@@ -249,11 +254,11 @@ useEffect(() => {
 
           <div className="flex flex-col md:flex-row justify-between gap-6">
             {renderCard("Total Submissions", totalSubmissions, [
-            { name: "Mentors", value: mentors.length },
-            { name: "Mentees", value: mentees.length },
-          ])}
-          {renderCard("Mentors", mentors.length, getGenderBreakdown(mentors))}
-          {renderCard("Mentees", mentees.length, getGenderBreakdown(mentees))}
+              { name: "Mentors", value: mentors.length },
+              { name: "Mentees", value: mentees.length },
+            ])}
+            {renderCard("Mentors", mentors.length, getGenderBreakdown(mentors))}
+            {renderCard("Mentees", mentees.length, getGenderBreakdown(mentees))}
           </div>
 
           <div className="mt-10">
@@ -292,46 +297,47 @@ useEffect(() => {
           </div>
         </>
       )}
-      view === "Match Settings" && (
-      <div className="max-w-4xl mx-auto mt-20 px-6">
-        <h2 className="text-3xl font-semibold text-center text-gray-800 mb-10">
-          Match Settings
-        </h2>
 
-        {settingsConfig.map(({ key, label, explanation }) => (
-          <div
-            key={key}
-            className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-200 py-6"
-          >
-            <div className="mb-2 sm:mb-0">
-              <select
-                value={matchWeights[key]}
-                onChange={(e) => handleWeightChange(key, e.target.value)}
-                className="border border-gray-300 rounded px-4 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="High">High</option>
-                <option value="Medium">Medium</option>
-                <option value="Low">Low</option>
-              </select>
+      {/* Match Settings View */}
+      {view === "Match Settings" && (
+        <div className="max-w-4xl mx-auto mt-20 px-6">
+          <h2 className="text-3xl font-semibold text-center text-gray-800 mb-10">
+            Match Settings
+          </h2>
+
+          {settingsConfig.map(({ key, label, explanation }) => (
+            <div
+              key={key}
+              className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-200 py-6"
+            >
+              <div className="mb-2 sm:mb-0">
+                <select
+                  value={matchWeights[key]}
+                  onChange={(e) => handleWeightChange(key, e.target.value)}
+                  className="border border-gray-300 rounded px-4 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="High">High</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Low">Low</option>
+                </select>
+              </div>
+              <div className="sm:ml-6 max-w-xl">
+                <p className="font-semibold text-gray-800">{label}</p>
+                <p className="text-sm text-gray-500 mt-1">{explanation}</p>
+              </div>
             </div>
-            <div className="sm:ml-6 max-w-xl">
-              <p className="font-semibold text-gray-800">{label}</p>
-              <p className="text-sm text-gray-500 mt-1">{explanation}</p>
-            </div>
-          </div>
-        ))}
+          ))}
 
-        <div className="mt-10 text-center">
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-          >
-            {saving ? "Saving..." : "Save Settings"}
-          </button>
+          <div className="mt-10 flex justify-center gap-4">
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {saving ? "Saving..." : "Save Settings"}
+            </button>
 
-          
-          <button
+            <button
               onClick={handleReset}
               className="px-6 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
             >
@@ -339,12 +345,17 @@ useEffect(() => {
             </button>
           </div>
 
-          {saveSuccess && <p className="mt-4 text-green-600">Settings saved successfully!</p>}
-          {saveError && <p className="mt-4 text-red-600">{saveError}</p>}
-
+          {saveSuccess && (
+            <p className="mt-4 text-green-600 text-center">
+              Settings saved successfully!
+            </p>
+          )}
+          {saveError && (
+            <p className="mt-4 text-red-600 text-center">{saveError}</p>
+          )}
         </div>
-      </div>
-    )
+      )}
     </div>
+  </div>  
   );
 }
