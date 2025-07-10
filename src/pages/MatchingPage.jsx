@@ -44,6 +44,7 @@ const handleSubmit = async (e) => {
   
       if (check.data.loggedIn) {
         navigate("/dashboard"); // 🔁 Replace "/dashboard" with your desired route
+        console.log("Authentication successful, navigating to dashboard");
       } else {
         setError("Login succeeded but authentication failed.");
       }
