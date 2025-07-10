@@ -77,17 +77,17 @@ export default function Dashboard() {
   };
 
   const settingsConfig = [
-    { key: "major", label: "Major", explanation: 'If a mentor/mentee selects that they want a counterpart in their major, this will default to high. If they say "no preference" it will default to medium, and if they say "no" it will default to low.' },
-    { key: "gender", label: "Gender", explanation: 'If a mentor/mentee selects a preferred gender, this will default to high. If they say "no preference" it will default to medium, and if they say "no" it will default to low.' },
+    { key: "major", label: "Major", explanation: 'Defaults baesed on user selection. If a mentor/mentee selects that they want a counterpart in their major, this will default to high and "no preference" to low.' },
+    { key: "gender", label: "Gender", explanation: 'Defaults baesed on user selection. If a mentor/mentee has a gender preference, this will default to high and "no preference" to low' },
     { key: "hobbies", label: "Hobbies", explanation: "Set the weight that hobby matching should hold in matching." },
-    { key: "musicalArtists", label: "Musical Artists", explanation: "Set the weight that musical artist matching should hold in matching." },
+    { key: "musicalArtists", label: "Musical Taste", explanation: "Set the weight that musical profile  matching should hold in matching." },
     { key: "personalityWords", label: "Personality Words", explanation: "Set the weight that personality matching should hold in matching." },
     { key: "expectations", label: "Expectations/Ideal Match", explanation: "Each user submits their expectations for their counterpart as well as their ideal counterpart." },
-    { key: "organizations", label: "Organizations", explanation: "Set the weight that organizational matching should hold in matching." },
+    { key: "organizations", label: "Org Involvement", explanation: "Set the weight that org involvement matching should hold in matching." },
     { key: "meetingFrequency", label: "Meeting Frequency", explanation: "Users enter how often they hope to meet with their counterparts." },
   ];
   
-
+  /*
   useEffect(() => {
     axios
       .get("https://nsbe-mentor-project.onrender.com/api/check", {
@@ -95,18 +95,19 @@ export default function Dashboard() {
       })
       .then((res) => {
         if (!res.data.loggedIn) {
-          navigate("/"); // ✅ works fine now
+          navigate("/"); 
         } else {
           setLoading(false);
         }
       })
       .catch((err) => {
         console.error("Auth check failed:", err);
-        navigate("/"); // ✅ works here too
+        navigate("/"); 
       });
   }, [navigate]);
   
-  
+  */
+
   useEffect(() => {
   if (!loading) {
     axios
@@ -138,9 +139,20 @@ useEffect(() => {
 
   loadSettings();
 }, []);
-
-  if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   
+/*
+ if (loading)
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-white">
+      <img
+        src="/pictures/nsbelogo.png"
+        alt="NSBE Logo"
+        className="w-24 h-24 animate-flip transform-style preserve-3d"
+      />
+      <p className="mt-4 text-gray-500 text-sm">Loading...</p>
+    </div>
+  );
+  */
   const totalSubmissions = data.length;
   const mentors = data.filter((entry) => entry.role === "mentor");
   const mentees = data.filter((entry) => entry.role === "mentee");
@@ -305,28 +317,51 @@ useEffect(() => {
             Match Settings
           </h2>
 
-          {settingsConfig.map(({ key, label, explanation }) => (
-            <div
-              key={key}
-              className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-200 py-6"
-            >
-              <div className="mb-2 sm:mb-0">
-                <select
-                  value={matchWeights[key]}
-                  onChange={(e) => handleWeightChange(key, e.target.value)}
-                  className="border border-gray-300 rounded px-4 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="High">High</option>
-                  <option value="Medium">Medium</option>
-                  <option value="Low">Low</option>
-                </select>
-              </div>
-              <div className="sm:ml-6 max-w-xl">
-                <p className="font-semibold text-gray-800">{label}</p>
-                <p className="text-sm text-gray-500 mt-1">{explanation}</p>
-              </div>
-            </div>
-          ))}
+          {settingsConfig.map(({ key, label, explanation }) => {
+  const isAutoCalculated = key === "major" || key === "gender";
+
+  return (
+    <div
+      key={key}
+      className="flex flex-col sm:flex-row sm:items-start gap-4 border-b border-gray-200 py-6"
+    >
+      <div className="w-full sm:w-40">
+        <select
+          value={matchWeights[key]}
+          disabled={isAutoCalculated}
+          onChange={(e) => handleWeightChange(key, e.target.value)}
+          className={`w-full border rounded px-4 py-2 text-gray-700 focus:outline-none ${
+            isAutoCalculated
+              ? "bg-gray-100 cursor-not-allowed"
+              : "border-gray-300 focus:ring-2 focus:ring-blue-500"
+          }`}
+        >
+          <option value="High">High</option>
+          <option value="Medium">Medium</option>
+          <option value="Low">Low</option>
+        </select>
+      </div>
+
+      <div className="flex-1">
+        <p className="font-semibold text-gray-800">{label}</p>
+        <p className="text-sm text-gray-500 mt-1">
+          {isAutoCalculated ? (
+            <>
+              <span className="italic">Automatically determined by user input.</span>{" "}
+              {key === "major"
+                ? 'If a user wants a match in their major, weight is High. If not, weight is Low.'
+                : 'If a user selects a preferred gender, weight is High. If "No preference" is selected, weight in Low.'}
+            </>
+          ) : (
+            explanation
+          )}
+        </p>
+      </div>
+    </div>
+  );
+})}
+
+
 
           <div className="mt-10 flex justify-center gap-4">
             <button
