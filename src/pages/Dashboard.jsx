@@ -55,8 +55,8 @@ export default function Dashboard() {
   const mentees = data.filter((entry) => entry.role === "mentee");
 
   const getGenderBreakdown = (entries) => {
-    const male = entries.filter((e) => e.gender === "male").length;
-    const female = entries.filter((e) => e.gender === "female").length;
+    const male = entries.filter((e) => e.gender === "Male").length;
+    const female = entries.filter((e) => e.gender === "Female").length;
     return [
       { name: "Male", value: male },
       { name: "Female", value: female },
