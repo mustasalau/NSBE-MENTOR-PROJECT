@@ -1423,16 +1423,14 @@ export default function SharedForm({ role, onSubmit }) {
                         : ""
                       }`}
                     onFocus={() => {
-                      const value = traitObj?.raw?.trim() || "";
-                      if (value && traitFuse) {
-                        const results = traitFuse
-                          .search(value)
-                          .map((r) => r.item);
-                        setTraitSuggestions(results);
-                        setActiveTraitIndex(index);
-                        setFocusedTraitOption(-1);
-                      }
-                    }}
+  const value = traitObj?.raw?.trim() || "";
+  if (value && traitFuse?.search) {
+    const results = traitFuse.search(value).map((r) => r.item);
+    setTraitSuggestions(results);
+    setActiveTraitIndex(index);
+    setFocusedTraitOption(-1);
+  }
+}}
                     onBlur={() => {
                       if (traitClickInProgress) {
                         setTraitClickInProgress(false);
