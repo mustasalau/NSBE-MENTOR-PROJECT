@@ -64,43 +64,45 @@ export default function Dashboard() {
   };
 
   const renderCard = (title, count, pieData) => (
-  <div className="bg-white rounded-2xl p-6 shadow-md w-full md:w-1/3 relative transition-opacity duration-1000">
+  <div className="bg-white rounded-2xl p-6 shadow-md w-full md:w-1/3 transition-opacity duration-1000 relative">
     <h2 className="text-lg font-semibold mb-2">{title}</h2>
     <CountUp end={count} duration={1.5} className="text-3xl font-bold" />
 
-    <ResponsiveContainer width="100%" height={150}>
+    <ResponsiveContainer width="100%" height={180}>
       <PieChart>
         <Pie
-  data={pieData}
-  dataKey="value"
-  nameKey="name"
-  cx="50%"
-  cy="50%"
-  outerRadius={50}
-  fill="#8884d8"
-  label={({ value, percent }) => `${value} (${(percent * 100).toFixed(0)}%)`}
->
-  {pieData.map((_, index) => (
-    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-  ))}
-</Pie>
+          data={pieData}
+          dataKey="value"
+          nameKey="name"
+          cx="50%"
+          cy="50%"
+          outerRadius={50}
+          fill="#8884d8"
+          label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+        >
+          {pieData.map((_, index) => (
+            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+          ))}
+        </Pie>
         <Tooltip />
       </PieChart>
     </ResponsiveContainer>
 
-    {/* Key/Legend in bottom-right */}
-    <div className="absolute bottom-4 right-4 text-xs text-gray-600">
-      <div className="flex items-center space-x-1 mb-1">
-        <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS[0] }} />
-        <span>Male</span>
-      </div>
-      <div className="flex items-center space-x-1">
-        <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS[1] }} />
-        <span>Female</span>
-      </div>
+    {/* Legend */}
+    <div className="absolute bottom-4 right-4 text-xs text-gray-600 space-y-1">
+      {pieData.map((entry, index) => (
+        <div key={index} className="flex items-center space-x-1">
+          <div
+            className="w-3 h-3 rounded-full"
+            style={{ backgroundColor: COLORS[index % COLORS.length] }}
+          />
+          <span>{entry.name}</span>
+        </div>
+      ))}
     </div>
   </div>
 );
+
 
 
   const filteredData = data.filter((entry) =>
@@ -145,9 +147,12 @@ export default function Dashboard() {
           <div className="w-24 h-1 bg-blue-300 mx-auto mt-2 mb-6 rounded-full" />
 
           <div className="flex flex-col md:flex-row justify-between gap-6">
-            {renderCard("Total Submissions", totalSubmissions, getGenderBreakdown(data))}
-            {renderCard("Mentors", mentors.length, getGenderBreakdown(mentors))}
-            {renderCard("Mentees", mentees.length, getGenderBreakdown(mentees))}
+            {renderCard("Total Submissions", totalSubmissions, [
+            { name: "Mentors", value: mentors.length },
+            { name: "Mentees", value: mentees.length },
+          ])}
+          {renderCard("Mentors", mentors.length, getGenderBreakdown(mentors))}
+          {renderCard("Mentees", mentees.length, getGenderBreakdown(mentees))}
           </div>
 
           <div className="mt-10">
