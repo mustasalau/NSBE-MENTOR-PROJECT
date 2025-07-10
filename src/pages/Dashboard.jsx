@@ -42,6 +42,8 @@ export default function Dashboard() {
         })
         .then((res) => setData(res.data))
         .catch((err) => console.error("Data fetch failed:", err));
+        console.log("Pie data:", pieData);
+
     }
   }, [loading]);
 
