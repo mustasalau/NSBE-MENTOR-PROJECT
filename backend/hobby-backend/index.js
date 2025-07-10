@@ -133,7 +133,6 @@ app.get("/api/hobbies/vectors", (req, res) => {
   res.json(hobbyVectors);
 });
 
-// In your backend (e.g. server.js or routes.js)
 app.get("/api/submissions", async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM mentor_mentee_submissions ORDER BY created_at DESC LIMIT 100");

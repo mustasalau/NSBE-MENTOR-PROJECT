@@ -65,6 +65,16 @@ export default function MatchingPage({ onLogin }) {
       setLoading(false);
     }
   };
+  useEffect(() => {
+  if (!loading) {
+    axios
+      .get("https://nsbe-mentor-project.onrender.com/api/submissions", {
+        withCredentials: true,
+      })
+      .then((res) => setData(res.data))
+      .catch((err) => console.error("Data fetch failed:", err));
+  }
+}, [loading]);
 
   return (
     <div className="min-h-screen bg-blue-50 flex items-center justify-center relative px-4">
