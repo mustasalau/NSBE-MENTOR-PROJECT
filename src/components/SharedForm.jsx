@@ -715,7 +715,7 @@ export default function SharedForm({ role, onSubmit }) {
     updated[index].raw = value;
     setFormData({ ...formData, personalityWords: updated });
 
-    if (value.trim().length >= 3 && traitFuse) {  // ✅ Add && traitFuse check
+    if (value.trim().length >= 3 && traitFuse) {  
     const results = traitFuse.search(value).map((r) => r.item);
     setTraitSuggestions(results);
     setActiveTraitIndex(index);
