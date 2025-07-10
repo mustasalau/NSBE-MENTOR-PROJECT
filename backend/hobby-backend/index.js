@@ -187,7 +187,7 @@ app.post("/api/submit", async (req, res) => {
     res.status(200).json({ message: "Submission saved successfully." });
   } catch (err) {
     console.error("Error inserting data:", err);
-    res.status(500).json({ error: "Database insert failed." });
+    res.status(500).json({ error: "Database insert failed.", detail: err.message });
   }
 });
 
