@@ -43,6 +43,7 @@ const handleSubmit = async (e) => {
       const check = await axiosInstance.get("https://nsbe-mentor-project.onrender.com/api/check");
   
       if (check.data.loggedIn) {
+        console.log("getting there");
         navigate("/dashboard"); // 🔁 Replace "/dashboard" with your desired route
         console.log("Authentication successful, navigating to dashboard");
       } else {
