@@ -1424,7 +1424,7 @@ export default function SharedForm({ role, onSubmit }) {
                       }`}
                     onFocus={() => {
                       const value = traitObj?.raw?.trim() || "";
-                      if (value) {
+                      if (value && traitFuse) {
                         const results = traitFuse
                           .search(value)
                           .map((r) => r.item);
