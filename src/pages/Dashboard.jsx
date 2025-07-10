@@ -42,7 +42,7 @@ export default function Dashboard() {
         })
         .then((res) => setData(res.data))
         .catch((err) => console.error("Data fetch failed:", err));
-        console.log("Pie data:", pieData);
+        
 
     }
   }, [loading]);
@@ -63,6 +63,7 @@ export default function Dashboard() {
   };
 
   const renderCard = (title, count, pieData) => (
+    console.log("Pie data:", pieData),
     <div className="bg-white rounded-2xl p-6 shadow-md w-full md:w-1/3 transition-opacity duration-1000">
       <h2 className="text-lg font-semibold mb-2">{title}</h2>
       <CountUp end={count} duration={1.5} className="text-3xl font-bold" />
@@ -78,9 +79,12 @@ export default function Dashboard() {
             fill="#8884d8"
             label
           >
+            
             {pieData.map((_, index) => (
               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              
             ))}
+            
           </Pie>
           <Tooltip />
         </PieChart>
