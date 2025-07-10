@@ -45,13 +45,6 @@ app.use("/api/spotify", spotifyRoutes);
 // === AUTH LOGIC ===
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
-function requireLogin(req, res, next) {
-  if (req.cookies.loggedIn === "true") {
-    return next();
-  } else {
-    return res.status(401).json({ error: "Not logged in" });
-  }
-}
 
 app.post("/api/login", (req, res) => {
   const { password } = req.body;
@@ -144,7 +137,7 @@ app.get("/api/submissions", async (req, res) => {
 });
 
 
-app.post("/api/submit", requireLogin, async (req, res) => {
+app.post("/api/submit", async (req, res) => {
   const data = req.body;
 
   try {
