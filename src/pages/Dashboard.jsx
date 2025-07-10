@@ -55,8 +55,8 @@ export default function Dashboard() {
   const mentees = data.filter((entry) => entry.role === "mentee");
 
   const getGenderBreakdown = (entries) => {
-    const male = entries.filter((e) => e.gender === "Male").length;
-    const female = entries.filter((e) => e.gender === "Female").length;
+    const male = entries.filter((e) => e.gender?.toLowerCase().trim() === "male").length;
+    const female = entries.filter((e) => e.gender?.toLowerCase().trim() === "female").length;
     return [
       { name: "Male", value: male },
       { name: "Female", value: female },
@@ -64,34 +64,44 @@ export default function Dashboard() {
   };
 
   const renderCard = (title, count, pieData) => (
-    console.log("Pie data:", pieData),
-    <div className="bg-white rounded-2xl p-6 shadow-md w-full md:w-1/3 transition-opacity duration-1000">
-      <h2 className="text-lg font-semibold mb-2">{title}</h2>
-      <CountUp end={count} duration={1.5} className="text-3xl font-bold" />
-      <ResponsiveContainer width="100%" height={150}>
-        <PieChart>
-          <Pie
-            data={pieData}
-            dataKey="value"
-            nameKey="name"
-            cx="50%"
-            cy="50%"
-            outerRadius={50}
-            fill="#8884d8"
-            label
-          >
-            
-            {pieData.map((_, index) => (
-              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-              
-            ))}
-            
-          </Pie>
-          <Tooltip />
-        </PieChart>
-      </ResponsiveContainer>
+  <div className="bg-white rounded-2xl p-6 shadow-md w-full md:w-1/3 relative transition-opacity duration-1000">
+    <h2 className="text-lg font-semibold mb-2">{title}</h2>
+    <CountUp end={count} duration={1.5} className="text-3xl font-bold" />
+
+    <ResponsiveContainer width="100%" height={150}>
+      <PieChart>
+        <Pie
+  data={pieData}
+  dataKey="value"
+  nameKey="name"
+  cx="50%"
+  cy="50%"
+  outerRadius={50}
+  fill="#8884d8"
+  label={({ value, percent }) => `${value} (${(percent * 100).toFixed(0)}%)`}
+>
+  {pieData.map((_, index) => (
+    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+  ))}
+</Pie>
+        <Tooltip />
+      </PieChart>
+    </ResponsiveContainer>
+
+    {/* Key/Legend in bottom-right */}
+    <div className="absolute bottom-4 right-4 text-xs text-gray-600">
+      <div className="flex items-center space-x-1 mb-1">
+        <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS[0] }} />
+        <span>Male</span>
+      </div>
+      <div className="flex items-center space-x-1">
+        <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS[1] }} />
+        <span>Female</span>
+      </div>
     </div>
-  );
+  </div>
+);
+
 
   const filteredData = data.filter((entry) =>
     entry.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
