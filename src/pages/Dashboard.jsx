@@ -35,17 +35,18 @@ export default function Dashboard() {
   
   
   useEffect(() => {
-    if (!loading) {
-      axios
-        .get("https://nsbe-mentor-project.onrender.com/api/submissions", {
-          withCredentials: true,
-        })
-        .then((res) => setData(res.data))
-        .catch((err) => console.error("Data fetch failed:", err));
-        
-
-    }
-  }, [loading]);
+  if (!loading) {
+    axios
+      .get("https://nsbe-mentor-project.onrender.com/api/submissions", {
+        withCredentials: true,
+      })
+      .then((res) => {
+        console.log("Fetched data:", res.data);  // 👈 Add this
+        setData(res.data);
+      })
+      .catch((err) => console.error("Data fetch failed:", err));
+  }
+}, [loading]);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   
