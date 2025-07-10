@@ -34,6 +34,7 @@ app.use(cors({
     'http://localhost:3000',                   // Common React dev port
     'http://localhost:5173'                    // Another common Vite port
   ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true
 }));
 app.use(express.json());
