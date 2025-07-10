@@ -41,14 +41,16 @@ const handleSubmit = async (e) => {
     } else if (res.status === 200 && res.data.success) {
       console.log("Login successful, checking auth...");
       const check = await axiosInstance.get("https://nsbe-mentor-project.onrender.com/api/check");
-  
-      if (check.data.loggedIn) {
-        console.log("getting there");
-        navigate("/dashboard"); // 🔁 Replace "/dashboard" with your desired route
-        console.log("Authentication successful, navigating to dashboard");
-      } else {
-        setError("Login succeeded but authentication failed.");
-      }
+console.log("Auth check response:", check.data);
+
+if (check.data.loggedIn) {
+  console.log("Authentication successful, navigating to dashboard");
+  navigate("/dashboard");
+} else {
+  console.warn("Check failed, not logged in:", check.data);
+  setError("Login succeeded but authentication failed.");
+}
+
       // Continue with your check logic...
     } else {
       console.log("Unexpected response:", res.status, res.data);
