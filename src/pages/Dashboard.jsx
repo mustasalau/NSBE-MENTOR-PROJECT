@@ -62,7 +62,18 @@ export default function Dashboard() {
       { name: "Female", value: female },
     ];
   };
-
+  const CustomTooltip = ({ active, payload, total }) => {
+  if (active && payload && payload.length) {
+    const { name, value } = payload[0];
+    const percent = ((value / total) * 100).toFixed(1);
+    return (
+      <div className="bg-white border px-2 py-1 rounded shadow text-sm">
+        <strong>{name}</strong>: {value} ({percent}%)
+      </div>
+    );
+  }
+  return null;
+};
   const renderCard = (title, count, pieData) => (
   <div className="bg-white rounded-2xl p-6 shadow-md w-full md:w-1/3 transition-opacity duration-1000 relative">
     <h2 className="text-lg font-semibold mb-2">{title}</h2>
@@ -71,20 +82,19 @@ export default function Dashboard() {
     <ResponsiveContainer width="100%" height={180}>
       <PieChart>
         <Pie
-          data={pieData}
-          dataKey="value"
-          nameKey="name"
-          cx="50%"
-          cy="50%"
-          outerRadius={50}
-          fill="#8884d8"
-          label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
-        >
-          {pieData.map((_, index) => (
-            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-          ))}
-        </Pie>
-        <Tooltip />
+  data={pieData}
+  dataKey="value"
+  nameKey="name"
+  cx="50%"
+  cy="50%"
+  outerRadius={50}
+  fill="#8884d8"
+>
+  {pieData.map((_, index) => (
+    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+  ))}
+</Pie>
+<Tooltip content={<CustomTooltip total={count} />} />
       </PieChart>
     </ResponsiveContainer>
 
