@@ -1,6 +1,10 @@
 import { useState } from "react";
 import axios from "axios";
 import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+const navigate = useNavigate();
+
+
 
 export default function MatchingPage({ onLogin }) {
   const [password, setPassword] = useState("");
@@ -36,6 +40,13 @@ const handleSubmit = async (e) => {
       setError("Incorrect password");
     } else if (res.status === 200 && res.data.success) {
       console.log("Login successful, checking auth...");
+      const check = await axiosInstance.get("https://nsbe-mentor-project.onrender.com/api/check");
+  
+      if (check.data.loggedIn) {
+        navigate("/dashboard"); // 🔁 Replace "/dashboard" with your desired route
+      } else {
+        setError("Login succeeded but authentication failed.");
+      }
       // Continue with your check logic...
     } else {
       console.log("Unexpected response:", res.status, res.data);
@@ -58,7 +69,7 @@ const handleSubmit = async (e) => {
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-800 to-black flex items-center justify-center relative px-4">
+<div className="min-h-screen bg-blue-50 flex items-center justify-center relative px-4">
       {/* Logo in top-left corner */}
       <Link to="/">
         <img

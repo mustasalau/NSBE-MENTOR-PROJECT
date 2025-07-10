@@ -133,12 +133,17 @@ app.get("/api/hobbies/vectors", (req, res) => {
   res.json(hobbyVectors);
 });
 
-app.get("/api/test", (req, res) => {
-  res.json({ 
-    adminPasswordExists: !!process.env.ADMIN_PASSWORD,
-    adminPasswordLength: process.env.ADMIN_PASSWORD?.length || 0
-  });
+// In your backend (e.g. server.js or routes.js)
+app.get("/api/submissions", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM mentor_mentee_submissions ORDER BY created_at DESC LIMIT 100");
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Failed to fetch submissions:", err);
+    res.status(500).json({ error: "Failed to fetch submissions" });
+  }
 });
+
 
 app.post("/api/submit", requireLogin, async (req, res) => {
   const data = req.body;
