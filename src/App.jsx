@@ -16,7 +16,6 @@ export default function App() {
       <Route path="/mentee" element={<MenteeForm />} />
       <Route path="/matching" element={<MatchingPage />} />
       <Route path="/dashboard" element={<Dashboard />} />
-
     </Routes>
   );
 }

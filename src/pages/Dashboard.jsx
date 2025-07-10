@@ -7,10 +7,10 @@ import CountUp from "react-countup";
 const COLORS = ["#4F46E5", "#60A5FA"];
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const navigate = useNavigate();
   const [view, setView] = useState("dashboard");
 
   
@@ -22,14 +22,14 @@ export default function Dashboard() {
       })
       .then((res) => {
         if (!res.data.loggedIn) {
-          navigate("/");
+          navigate("/"); // ✅ works fine now
         } else {
           setLoading(false);
         }
       })
       .catch((err) => {
         console.error("Auth check failed:", err);
-        navigate("/");
+        navigate("/"); // ✅ works here too
       });
   }, [navigate]);
   
