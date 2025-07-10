@@ -6,13 +6,86 @@ import CountUp from "react-countup";
 
 const COLORS = ["#4F46E5", "#60A5FA"];
 
+  
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [view, setView] = useState("dashboard");
+  const [matchWeights, setMatchWeights] = useState({
+    major: "Medium",
+    gender: "Medium",
+    hobbies: "Medium",
+    musicalArtists: "Medium",
+    personalityWords: "Medium",
+    expectations: "Medium",
+    organizations: "Medium",
+    meetingFrequency: "Medium",
+  });
+  const defaultMatchWeights = {
+  major: "Medium",
+  gender: "Medium",
+  hobbies: "Medium",
+  musicalArtists: "Medium",
+  personalityWords: "Medium",
+  expectations: "Medium",
+  organizations: "Medium",
+  meetingFrequency: "Medium",
+};
 
+  const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState("");
+
+  const handleWeightChange = (key, value) => {
+    setMatchWeights((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleReset = async () => {
+  setMatchWeights(defaultMatchWeights);
+
+  try {
+    await axios.post("https://nsbe-mentor-project.onrender.com/api/save-match-settings", defaultMatchWeights);
+    setSaveSuccess(true);
+    setSaveError("");
+  } catch (error) {
+    console.error("Failed to reset settings:", error);
+    setSaveError("Failed to reset settings.");
+  }
+};
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveSuccess(false);
+    setSaveError("");
+
+    try {
+      const response = await axios.post("https://nsbe-mentor-project.onrender.com/api/save-match-settings", matchWeights);
+      if (response.status === 200) {
+        setSaveSuccess(true);
+      } else {
+        throw new Error("Unexpected response");
+      }
+    } catch (error) {
+      setSaveError("Failed to save settings.");
+      console.error(error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const settingsConfig = [
+    { key: "major", label: "Major", explanation: 'If a mentor/mentee selects that they want a counterpart in their major, this will default to high. If they say "no preference" it will default to medium, and if they say "no" it will default to low.' },
+    { key: "gender", label: "Gender", explanation: 'If a mentor/mentee selects a preferred gender, this will default to high. If they say "no preference" it will default to medium, and if they say "no" it will default to low.' },
+    { key: "hobbies", label: "Hobbies", explanation: "Set the weight that hobby matching should hold in matching." },
+    { key: "musicalArtists", label: "Musical Artists", explanation: "Set the weight that musical artist matching should hold in matching." },
+    { key: "personalityWords", label: "Personality Words", explanation: "Set the weight that personality matching should hold in matching." },
+    { key: "expectations", label: "Expectations/Ideal Match", explanation: "Each user submits their expectations for their counterpart as well as their ideal counterpart." },
+    { key: "organizations", label: "Organizations", explanation: "Set the weight that organizational matching should hold in matching." },
+    { key: "meetingFrequency", label: "Meeting Frequency", explanation: "Users enter how often they hope to meet with their counterparts." },
+  ];
   
 
   useEffect(() => {
@@ -47,6 +120,24 @@ export default function Dashboard() {
       .catch((err) => console.error("Data fetch failed:", err));
   }
 }, [loading]);
+
+useEffect(() => {
+  const loadSettings = async () => {
+    try {
+      const res = await axios.get("https://nsbe-mentor-project.onrender.com/api/get-match-settings");
+      if (res.data) {
+        setMatchWeights((prev) => ({
+          ...prev,
+          ...res.data,
+        }));
+      }
+    } catch (error) {
+      console.error("Failed to load match settings:", error);
+    }
+  };
+
+  loadSettings();
+}, []);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   
@@ -139,14 +230,14 @@ export default function Dashboard() {
     Dashboard
   </button>
   <button
-    onClick={() => setView("matches")}
+    onClick={() => setView("Match Settings")}
     className={`text-xs font-medium px-3 py-1 rounded-full transition ${
-      view === "matches"
+      view === "Match Settings"
         ? "bg-blue-100 text-blue-700"
         : "text-gray-400 hover:bg-gray-100"
     }`}
   >
-    Matches
+    Match Settings
   </button>
 </div>
 
@@ -201,13 +292,59 @@ export default function Dashboard() {
           </div>
         </>
       )}
+      view === "Match Settings" && (
+      <div className="max-w-4xl mx-auto mt-20 px-6">
+        <h2 className="text-3xl font-semibold text-center text-gray-800 mb-10">
+          Match Settings
+        </h2>
 
-      {view === "matches" && (
-        <div className="text-center text-gray-600 mt-20">
-          <h2 className="text-2xl font-semibold mb-4">Matches</h2>
-          <p>This is where matched mentor-mentee pairs will be displayed.</p>
+        {settingsConfig.map(({ key, label, explanation }) => (
+          <div
+            key={key}
+            className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-200 py-6"
+          >
+            <div className="mb-2 sm:mb-0">
+              <select
+                value={matchWeights[key]}
+                onChange={(e) => handleWeightChange(key, e.target.value)}
+                className="border border-gray-300 rounded px-4 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+              </select>
+            </div>
+            <div className="sm:ml-6 max-w-xl">
+              <p className="font-semibold text-gray-800">{label}</p>
+              <p className="text-sm text-gray-500 mt-1">{explanation}</p>
+            </div>
+          </div>
+        ))}
+
+        <div className="mt-10 text-center">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          >
+            {saving ? "Saving..." : "Save Settings"}
+          </button>
+
+          
+          <button
+              onClick={handleReset}
+              className="px-6 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
+            >
+              Reset to Default
+            </button>
+          </div>
+
+          {saveSuccess && <p className="mt-4 text-green-600">Settings saved successfully!</p>}
+          {saveError && <p className="mt-4 text-red-600">{saveError}</p>}
+
         </div>
-      )}
+      </div>
+    )
     </div>
-  </div>
-)};
+  );
+}

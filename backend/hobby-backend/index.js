@@ -191,4 +191,100 @@ app.post("/api/submit", async (req, res) => {
   }
 });
 
+router.post("/save-match-settings", async (req, res) => {
+  const {
+    major,
+    gender,
+    hobbies,
+    musicalArtists,
+    personalityWords,
+    expectations,
+    organizations,
+    meetingFrequency,
+  } = req.body;
+
+  try {
+    const existing = await pool.query("SELECT id FROM match_settings LIMIT 1");
+
+    if (existing.rows.length > 0) {
+      // Update existing row
+      await pool.query(
+        `UPDATE match_settings SET
+          major = $1,
+          gender = $2,
+          hobbies = $3,
+          musical_artists = $4,
+          personality_words = $5,
+          expectations = $6,
+          organizations = $7,
+          meeting_frequency = $8,
+          updated_at = NOW()
+        WHERE id = $9`,
+        [
+          major,
+          gender,
+          hobbies,
+          musicalArtists,
+          personalityWords,
+          expectations,
+          organizations,
+          meetingFrequency,
+          existing.rows[0].id,
+        ]
+      );
+    } else {
+      // Insert new row
+      await pool.query(
+        `INSERT INTO match_settings
+        (major, gender, hobbies, musical_artists, personality_words, expectations, organizations, meeting_frequency)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [
+          major,
+          gender,
+          hobbies,
+          musicalArtists,
+          personalityWords,
+          expectations,
+          organizations,
+          meetingFrequency,
+        ]
+      );
+    }
+
+    res.status(200).json({ message: "Match settings saved successfully." });
+  } catch (err) {
+    console.error("Error saving match settings:", err);
+    res.status(500).json({ error: "Failed to save match settings." });
+  }
+});
+
+router.get("/get-match-settings", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM match_settings LIMIT 1");
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "No settings found." });
+    }
+
+    const row = result.rows[0];
+
+    res.status(200).json({
+      major: row.major,
+      gender: row.gender,
+      hobbies: row.hobbies,
+      musicalArtists: row.musical_artists,
+      personalityWords: row.personality_words,
+      expectations: row.expectations,
+      organizations: row.organizations,
+      meetingFrequency: row.meeting_frequency,
+    });
+  } catch (err) {
+    console.error("Error fetching match settings:", err);
+    res.status(500).json({ error: "Failed to load match settings." });
+  }
+});
+
+app.use("/api", matchSettingsRoutes);
+
+
 app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
