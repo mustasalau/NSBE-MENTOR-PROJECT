@@ -259,7 +259,7 @@ app.post("/api/save-match-settings", async (req, res) => {
   }
 });
 
-app.get("/get-match-settings", async (req, res) => {
+app.get("/api/get-match-settings", async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM match_settings LIMIT 1");
 
