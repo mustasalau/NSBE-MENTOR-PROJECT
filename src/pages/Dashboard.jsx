@@ -109,18 +109,17 @@ export default function Dashboard() {
   */
 
   useEffect(() => {
-  if (!loading) {
-    axios
-      .get("https://nsbe-mentor-project.onrender.com/api/submissions", {
-        withCredentials: true,
-      })
-      .then((res) => {
-        console.log("Fetched data:", res.data);  // 👈 Add this
-        setData(res.data);
-      })
-      .catch((err) => console.error("Data fetch failed:", err));
-  }
-}, []); 
+  axios
+    .get("https://nsbe-mentor-project.onrender.com/api/submissions", {
+      withCredentials: true,
+    })
+    .then((res) => {
+      console.log("Fetched data:", res.data); // ✅ Should print your submissions
+      setData(res.data);
+    })
+    .catch((err) => console.error("Data fetch failed:", err))
+    .finally(() => setLoading(false));
+}, []);
 
 useEffect(() => {
   const loadSettings = async () => {
