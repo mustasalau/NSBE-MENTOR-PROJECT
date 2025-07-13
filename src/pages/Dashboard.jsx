@@ -120,7 +120,7 @@ export default function Dashboard() {
       })
       .catch((err) => console.error("Data fetch failed:", err));
   }
-}, [loading]);
+}, []); 
 
 useEffect(() => {
   const loadSettings = async () => {
@@ -154,8 +154,8 @@ useEffect(() => {
   );
   */
   const totalSubmissions = data.length;
-  const mentors = data.filter((entry) => entry.role === "mentor");
-  const mentees = data.filter((entry) => entry.role === "mentee");
+ const mentors = data.filter((entry) => entry.role?.toLowerCase() === "mentor");
+const mentees = data.filter((entry) => entry.role?.toLowerCase() === "mentee");
 
   const getGenderBreakdown = (entries) => {
     const male = entries.filter((e) => e.gender?.toLowerCase().trim() === "male").length;
