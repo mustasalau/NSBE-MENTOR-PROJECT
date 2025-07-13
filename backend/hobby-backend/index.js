@@ -27,6 +27,7 @@ const hobbies = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "src
 const hobbyVectorPath = path.join(__dirname, "openAI_hobby_vectors.json");
 let hobbyVectors = loadVectors(hobbyVectorPath);
 
+
 app.use(cors({
   origin: [
     'https://nsbe-mentor-project.vercel.app',  // Production
@@ -191,7 +192,7 @@ app.post("/api/submit", async (req, res) => {
   }
 });
 
-app.post("/save-match-settings", async (req, res) => {
+app.post("/api/save-match-settings", async (req, res) => {
   const {
     major,
     gender,
@@ -284,7 +285,6 @@ app.get("/get-match-settings", async (req, res) => {
   }
 });
 
-app.use("/api", matchSettingsRoutes);
 
 
 app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
