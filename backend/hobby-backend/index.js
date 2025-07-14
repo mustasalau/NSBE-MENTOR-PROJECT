@@ -155,12 +155,13 @@ app.post("/api/submit", async (req, res) => {
         role, first_name, last_name, email, personal_email, student_id,
         major, gender, year, pair_gender_preference, meeting_frequency,
         hobbies, musical_artists, organizations, personality_words,
-        expectations, ideal_match_description, mentee_in_major, open_to_multiple
+        expectations, ideal_match_description, mentee_in_major, open_to_multiple,
+        musical_artists_json
       ) VALUES (
         $1, $2, $3, $4, $5, $6,
         $7, $8, $9, $10, $11,
         $12, $13, $14, $15,
-        $16, $17, $18, $19
+        $16, $17, $18, $19, $20
       )`,
       [
         role,
@@ -181,7 +182,8 @@ app.post("/api/submit", async (req, res) => {
         expectations,
         idealMatchDescription,
         menteeInMajor,
-        openToMultiple
+        openToMultiple,
+        JSON.stringify(musicalArtists)
       ]
     );
 
