@@ -330,7 +330,7 @@ app.post("/api/submit", strictRateLimit, async (req, res) => {
       
       for (const hobby of hobbies) {
         if (hobby && hobby.trim()) {
-          const hobbyKey = hobby.trim().toLowerCase();
+          const hobbyKey = hobby.trim().replace(/\b\w/g, (c) => c.toUpperCase());
           
           let embeddingArray = hobbyVectors[hobbyKey];
           if (!embeddingArray) {
