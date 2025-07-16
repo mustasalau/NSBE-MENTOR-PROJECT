@@ -196,7 +196,10 @@ app.post("/api/hobbies/normalize", strictRateLimit, async (req, res) => {
   let updated = false;
 
   for (const hobby of userHobbies) {
-    const normalized = hobby.trim().replace(/\b\w/g, (c) => c.toUpperCase());
+    // ✅ NEW: Use sentence case (only first letter capitalized)
+    const normalized = hobby.trim().toLowerCase()
+      .replace(/^\w/, (c) => c.toUpperCase());
+  
     if (!normalized) continue;
 
     const exists = hobbies.find(h => h.toLowerCase() === normalized.toLowerCase());
@@ -330,7 +333,9 @@ app.post("/api/submit", strictRateLimit, async (req, res) => {
       
       for (const hobby of hobbies) {
         if (hobby && hobby.trim()) {
-          const hobbyKey = hobby.trim().replace(/\b\w/g, (c) => c.toUpperCase());
+          // ✅ Use sentence case to match static list
+          const hobbyKey = hobby.trim().toLowerCase()
+            .replace(/^\w/, (c) => c.toUpperCase());
           
           let embeddingArray = hobbyVectors[hobbyKey];
           if (!embeddingArray) {
