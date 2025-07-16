@@ -26,6 +26,11 @@ const hobbies = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "src
 const hobbyVectorPath = path.join(__dirname, "openAI_hobby_vectors.json");
 let hobbyVectors = loadVectors(hobbyVectorPath);
 
+// ✅ ADD: Load trait vectors globally
+const traits = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "src", "data", "traits.json")));
+const traitVectorPath = path.join(__dirname, "openAI_trait_vectors.json");
+let traitVectors = loadVectors(traitVectorPath);
+
 // Security Headers Middleware
 app.use((req, res, next) => {
   // Content Security Policy
@@ -511,9 +516,7 @@ app.get("/api/get-match-settings", async (req, res) => {
   }
 });
 
-// Load trait vectors for matching
-const traitVectorPath = path.join(__dirname, "openAI_trait_vectors.json");
-let traitVectors = loadVectors(traitVectorPath);
+
 
 // Utility functions for matching algorithm
 function mapWeight(level) {
