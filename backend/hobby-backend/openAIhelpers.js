@@ -47,3 +47,37 @@ export async function vectorizeAndSave(term, filePath, vectors, promptPrefix = "
 
   return embedding;
 }
+
+// Convert array to pgvector string format
+export function arrayToVectorString(array) {
+  if (!Array.isArray(array) || array.length !== 1536) {
+    throw new Error('Vector must be an array of 1536 numbers');
+  }
+  return `[${array.join(',')}]`;
+}
+
+// Update vectorizeText to support hobby and trait types
+export async function vectorizeText(text, textType, role) {
+  let promptPrefix = "";
+  
+  if (textType === "expectations") {
+    if (role === "mentor") {
+      promptPrefix = "These are the expectations a mentor has for their prospective mentee: ";
+    } else {
+      promptPrefix = "These are the expectations a mentee has for their prospective mentor: ";
+    }
+  } else if (textType === "idealMatch") {
+    if (role === "mentor") {
+      promptPrefix = "This is a description of a mentor's ideal mentee: ";
+    } else {
+      promptPrefix = "This is a description of a mentee's ideal mentor: ";
+    }
+  } else if (textType === "hobby") {
+    promptPrefix = "This is a hobby or leisure activity someone might enjoy: ";
+  } else if (textType === "trait") {
+    promptPrefix = "This is a personal trait or characteristic: ";
+  }
+
+  const embedding = await getEmbedding(`${promptPrefix}${text}`);
+  return embedding;
+}

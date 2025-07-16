@@ -44,11 +44,11 @@ export default function SharedForm({ role, onSubmit }) {
   const [spotifyResults, setSpotifyResults] = useState([]);
   const searchTimeouts = useRef([]);
   const audioRefs = useRef([]);
-  const [hobbiesLoading, setHobbiesLoading] = useState(false);
+
   const [traitSuggestions, setTraitSuggestions] = useState([]);
   const [activeTraitIndex, setActiveTraitIndex] = useState(null);
   const [focusedTraitOption, setFocusedTraitOption] = useState(-1);
-  const [traitsLoading, setTraitsLoading] = useState(false);
+
   const [traitVectors, setTraitVectors] = useState({});
   const [traitFuse, setTraitFuse] = useState(null);
   const [traitClickInProgress, setTraitClickInProgress] = useState(false);
@@ -58,6 +58,7 @@ export default function SharedForm({ role, onSubmit }) {
   const [showConfetti, setShowConfetti] = useState(false);
   const [showTitle, setShowTitle] = useState(false);
   const [showMessage, setShowMessage] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const BASE_URL = import.meta.env.VITE_BACKEND_URL;
 
   const errorMessages = {
@@ -74,11 +75,11 @@ export default function SharedForm({ role, onSubmit }) {
     pairGenderPreference: "Please select your preferred mentee gender.",
     meetingFrequency: "Please select your preferred meeting frequency.",
     openToMultiple: "Please indicate if you are open to mentoring two mentees.",
-    expectations: "Please describe your mentorship style.",
+    expectations: "Please describe your mentorship style (250 characters max).",
     personalityWords: "Please describe yourself in 3 words.",
     idealMatchDescription: role === "mentor"
-    ? "Please describe your ideal mentee."
-    : "Please describe your ideal mentor.",
+    ? "Please describe your ideal mentee (250 characters max)."
+    : "Please describe your ideal mentor (250 characters max).",
     menteeInMajor: role === "mentor" 
     ? "Please indicate if you prefer mentees in your major."
     : "Please indicate if you are looking for a mentor in your major.",
@@ -167,6 +168,15 @@ export default function SharedForm({ role, onSubmit }) {
       }
     }
 
+    // Validate character limits for expectations and ideal match description
+    if (stepToValidate === 6 && formData.expectations.length > 250) {
+      if (!missing.includes("expectations")) missing.push("expectations");
+    }
+
+    if (stepToValidate === 7 && formData.idealMatchDescription.length > 250) {
+      if (!missing.includes("idealMatchDescription")) missing.push("idealMatchDescription");
+    }
+
     setErrors(missing);
     if (missing.length > 0) {
       nextBtnRef.current?.classList.add("animate-shake");
@@ -211,7 +221,16 @@ export default function SharedForm({ role, onSubmit }) {
     console.log(`Selected item:`, item);
     console.log(`Preview URL for "${item.name}":`, item.preview_url);
 
-    const displayName = `${item.name}${item.artists ? ` by ${item.artists.join(", ")}` : ""}`;
+    // Format displayName based on type
+    let displayName;
+    if (item.type === "artist") {
+      // For artists, just use the artist name
+      displayName = item.name;
+    } else {
+      // For songs and albums, use "Name by Artist" format
+      displayName = `${item.name}${item.artists ? ` by ${item.artists.join(", ")}` : ""}`;
+    }
+    
     const updated = [...formData.musicalArtists];
     updated[index] = displayName;
 
@@ -400,79 +419,160 @@ export default function SharedForm({ role, onSubmit }) {
   };
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  if (!validateStep(step)) return;
+    e.preventDefault();
+    if (!validateStep(step)) return;
 
-  const cleanData = {
-    ...formData,
-    hobbies: formData.hobbies.map((h) => h.trim()).filter(Boolean),
-    organizations: formData.organizations
-      .map((org) => org.trim())
-      .filter(Boolean),
-    musicalArtists: formData.musicalArtists.map((a, index) => ({
-      displayName: a.trim(),
-      genres: spotifyResults[index]?.genres || [],
-    })),
-  };
+    setIsSubmitting(true);
 
-  try {
-    const response = await fetch(import.meta.env.VITE_BACKEND_URL + '/api/submit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...cleanData,
-        role, // assuming this is passed as a prop
-        meetingFrequency: formData.meetingFrequency,
-        personalityWords: formData.personalityWords,
-        expectations: formData.expectations,
-        idealMatchDescription: formData.idealMatchDescription,
-        menteeInMajor: formData.menteeInMajor,
-        openToMultiple: formData.openToMultiple,
-      }),
-    });
+    try {
+      console.log("🚀 Starting vectorization and submission process...");
 
-    if (!response.ok) {
-      throw new Error("Failed to submit form");
+      // Step 1: Vectorize unknown hobbies
+      const unknownHobbies = formData.hobbies
+        .map((h) => h.trim())
+        .filter((h) => h && !hobbyVectors[h] && 
+          !fuse.search(h).some((r) => r.item.toLowerCase() === h.toLowerCase())
+        );
+
+      if (unknownHobbies.length > 0) {
+        console.log("🔄 Vectorizing unknown hobbies:", unknownHobbies);
+        const res = await fetch(
+          `${import.meta.env.VITE_BACKEND_URL}/api/hobbies/normalize`,
+          {
+            method: 'POST',
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ hobbies: unknownHobbies }),
+          },
+        );
+        
+        const data = await res.json();
+        console.log("✅ Hobbies vectorized:", data);
+
+        // Reload vector list after backend updates
+        const updated = await fetch(
+          `${import.meta.env.VITE_BACKEND_URL}/api/hobbies/vectors`,
+        );
+        const vectors = await updated.json();
+        setHobbyVectors(vectors);
+        fuse.setCollection(Object.keys(vectors));
+      }
+
+      // Step 2: Vectorize unknown personality traits
+      const unknownTraits = formData.personalityWords
+        .map((t) => toTitleCase(t.raw?.trim()))
+        .filter((term) => {
+          if (!term) return false;
+          const isExact = traitFuse
+            ?.search(term)
+            .some((r) => r.item.toLowerCase() === term.toLowerCase());
+          return !traitVectors[term] && !isExact;
+        });
+
+      if (unknownTraits.length > 0) {
+        console.log("🔄 Vectorizing unknown traits:", unknownTraits);
+        for (const term of unknownTraits) {
+          const res = await axios.post(
+            `${import.meta.env.VITE_BACKEND_URL}/api/traits/add`,
+            { trait: term },
+          );
+
+          if (res.data.embedding) {
+            console.log(`✅ "${term}" vectorized successfully.`);
+            setTraitVectors((prev) => ({
+              ...prev,
+              [term]: res.data.embedding,
+            }));
+
+            if (traitFuse) {
+              traitFuse.add(term);
+            }
+          }
+        }
+      }
+
+      // Step 3: Prepare clean data
+      const cleanData = {
+        ...formData,
+        hobbies: formData.hobbies.map((h) => h.trim()).filter(Boolean),
+        organizations: formData.organizations
+          .map((org) => org.trim())
+          .filter(Boolean),
+        musicalArtists: formData.musicalArtists.map((a, index) => ({
+          displayName: a.trim(),
+          genres: spotifyResults[index]?.genres || [],
+        })),
+      };
+
+      // Step 4: Submit to backend (which will handle expectations/ideal match vectorization)
+      console.log("🔄 Submitting form data...");
+      const response = await fetch(import.meta.env.VITE_BACKEND_URL + '/api/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...cleanData,
+          role,
+          meetingFrequency: formData.meetingFrequency,
+          personalityWords: formData.personalityWords,
+          expectations: formData.expectations,
+          idealMatchDescription: formData.idealMatchDescription,
+          menteeInMajor: formData.menteeInMajor,
+          openToMultiple: formData.openToMultiple,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to submit form");
+      }
+
+      console.log("✅ Submission successful!");
+
+      // Log submission data
+      console.log("==== Final Submission Data ====");
+      console.log("First Name:", formData.firstName);
+      console.log("Last Name:", formData.lastName);
+      console.log("PSU Email:", formData.email);
+      console.log("Personal Email:", formData.personalEmail);
+      console.log("Student ID:", formData.studentId);
+      console.log("Major:", formData.major);
+      console.log("Gender:", formData.gender);
+      console.log("Academic Year:", formData.year);
+      console.log("Mentee Gender Preference:", formData.pairGenderPreference);
+
+      console.log("\nHobbies:", cleanData.hobbies);
+      console.log("\nMusical Artists:");
+      cleanData.musicalArtists.forEach((artist, i) => {
+        console.log(`  ${i + 1}: ${artist.displayName} | Genres: ${artist.genres.join(", ")}`);
+      });
+
+      console.log("\nMeeting Frequency:", formData.meetingFrequency);
+      console.log("Open to Multiple Mentees:", formData.openToMultiple);
+      console.log("Prefers Mentees in Major:", formData.menteeInMajor);
+
+      console.log("\nOrganizations:", cleanData.organizations);
+      console.log("\nMentorship Expectations:", formData.expectations);
+
+      console.log("\nPersonality Words:");
+      formData.personalityWords.forEach((t, i) => {
+        console.log(`  ${i + 1}: ${t.raw}`);
+      });
+
+      console.log("\nIdeal Mentee/Mentor Description:", formData.idealMatchDescription);
+      console.log("==== End of Submission Data ====");
+
+      // Success! Show confetti and proceed to success page
+      setShowConfetti(true);
+      setTimeout(() => {
+        setIsSubmitting(false);
+        setStep(8);
+      }, 1000); // Small delay to show the success before transitioning
+
+    } catch (err) {
+      console.error("🚨 Submission error:", err);
+      alert(`Submission failed: ${err.message}`);
+      setIsSubmitting(false);
     }
-
-    console.log("✅ Submission successful!");
-  } catch (err) {
-    console.error("🚨 Submission error:", err);
-  }
-
-  // Logging (optional)
-  console.log("==== Final Submission Data ====");
-  console.log("First Name:", formData.firstName);
-  console.log("Last Name:", formData.lastName);
-  console.log("PSU Email:", formData.email);
-  console.log("Personal Email:", formData.personalEmail);
-  console.log("Student ID:", formData.studentId);
-  console.log("Major:", formData.major);
-  console.log("Gender:", formData.gender);
-  console.log("Academic Year:", formData.year);
-  console.log("Mentee Gender Preference:", formData.pairGenderPreference);
-
-  console.log("\nHobbies:", cleanData.hobbies);
-  console.log("\nMusical Artists:");
-  cleanData.musicalArtists.forEach((artist, i) => {
-    console.log(`  ${i + 1}: ${artist.displayName} | Genres: ${artist.genres.join(", ")}`);
-  });
-
-  console.log("\nMeeting Frequency:", formData.meetingFrequency);
-  console.log("Open to Multiple Mentees:", formData.openToMultiple);
-  console.log("Prefers Mentees in Major:", formData.menteeInMajor);
-
-  console.log("\nOrganizations:", cleanData.organizations);
-  console.log("\nMentorship Expectations:", formData.expectations);
-
-  console.log("\nPersonality Words:");
-  formData.personalityWords.forEach((t, i) => {
-    console.log(`  ${i + 1}: ${t.raw}`);
-  });
-
-  console.log("\nIdeal Mentee/Mentor Description:", formData.idealMatchDescription);
-  console.log("==== End of Submission Data ====");
-};
+  };
 
   const handleHobbyChange = (index, value) => {
     const hobbies = [...formData.hobbies];
@@ -615,95 +715,6 @@ export default function SharedForm({ role, onSubmit }) {
   const handleNext = async () => {
     if (!validateStep(step)) return;
 
-    if (step === 2) {
-      const unknowns = formData.hobbies
-        .map((h, i) => ({ text: h.trim(), index: i }))
-        .filter(
-          (h) =>
-            h.text &&
-            !fuse
-              .search(h.text)
-              .some((r) => r.item.toLowerCase() === h.text.toLowerCase()) &&
-            !hobbyVectors[h.text],
-        );
-
-      if (unknowns.length > 0) {
-        try {
-          setHobbiesLoading(true);
-
-          const res = await fetch(
-            `${import.meta.env.VITE_BACKEND_URL}/api/hobbies/normalize`,
-            {
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ hobbies: unknowns.map((h) => h.text) }),
-            },
-          );
-
-          const data = await res.json();
-          console.log("New hobbies normalized:", data);
-
-          // Reload vector list after backend updates
-          const updated = await fetch(
-            `${import.meta.env.VITE_BACKEND_URL}/api/hobbies/vectors`,
-          );
-          const vectors = await updated.json();
-
-          setHobbyVectors(vectors);
-
-          fuse.setCollection(Object.keys(vectors));
-        } catch (err) {
-          console.error("Error submitting unknown hobbies:", err);
-        } finally {
-          setHobbiesLoading(false);
-        }
-      }
-    }
-
-    if (step === 7) {
-      const pending = formData.personalityWords
-        .map((t, i) => ({ ...t, index: i }))
-        .filter((t) => {
-          const term = toTitleCase(t.raw?.trim());
-          const isExact = traitFuse
-            ?.search(term)
-            .some((r) => r.item.toLowerCase() === term.toLowerCase());
-          return term && !traitVectors[term] && !isExact;
-        });
-
-      if (pending.length > 0) {
-        try {
-          setTraitsLoading(true);
-          for (const t of pending) {
-            const term = toTitleCase(t.raw?.trim());
-            const res = await axios.post(
-              `${import.meta.env.VITE_BACKEND_URL}/api/traits/add`,
-              { trait: term },
-            );
-
-            if (res.data.embedding) {
-              console.log(`✅ "${term}" vectorized successfully.`);
-
-              setTraitVectors((prev) => ({
-                ...prev,
-                [term]: res.data.embedding,
-              }));
-
-              if (traitFuse) {
-                traitFuse.add(term);
-                console.log(`✅ "${term}" added to Fuse suggestions.`);
-              }
-            }
-          }
-        } catch (err) {
-          console.error("Error adding traits:", err);
-          setTraitsLoading(false);
-          return;
-        } finally {
-          setTraitsLoading(false);
-        }
-      }
-    }
-
     if (step < 8) {
       setErrors([]);
       setStep((prev) => prev + 1);
@@ -740,13 +751,37 @@ export default function SharedForm({ role, onSubmit }) {
     setActiveTraitIndex(null);
   };
 
+  // NSBE Logo Loading Component
+  const NSBELoadingOverlay = () => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white p-8 rounded-lg shadow-lg text-center">
+        <div className="mb-4">
+          <img 
+            src="/pictures/nsbelogo.png" 
+            alt="NSBE Logo" 
+            className="w-24 h-24 mx-auto animate-pulse"
+          />
+        </div>
+        <div className="flex items-center justify-center space-x-2">
+          <div className="w-3 h-3 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+          <div className="w-3 h-3 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+          <div className="w-3 h-3 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+        </div>
+        <p className="mt-4 text-gray-700 font-medium">Processing your application...</p>
+        <p className="text-sm text-gray-500">"Patience young one" - Mus 2025</p>
+      </div>
+    </div>
+  );
+
   return (
-    <form
-      onSubmit={handleSubmit}
-      className={`space-y-4 mx-auto ${step < 8 ? "bg-white p-6 rounded shadow-lg max-w-lg" : ""}`}
-    >
-      {" "}
-      {errors.length > 0 && (
+    <>
+      {isSubmitting && <NSBELoadingOverlay />}
+      <form
+        onSubmit={handleSubmit}
+        className={`space-y-4 mx-auto ${step < 8 ? "bg-white p-6 rounded shadow-lg max-w-lg" : ""}`}
+      >
+        {" "}
+        {errors.length > 0 && (
         <div className="absolute right-6 top-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-md w-80">
           <strong className="font-bold">Please complete:</strong>
           <ul className="mt-2 list-disc list-inside text-sm">
@@ -920,13 +955,7 @@ export default function SharedForm({ role, onSubmit }) {
         </div>
       )}
       {step === 2 && (
-        <div className="space-y-4 relative">
-          {hobbiesLoading && (
-            <div className="absolute inset-0 bg-white bg-opacity-50 flex justify-center items-center z-20">
-              <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
-            </div>
-          )}
-
+        <div className="space-y-4">
           <h3 className="text-xl font-semibold text-gray-800">Hobbies</h3>
           <p className="font-medium text-base text-violet-500 text-center">
             What do you do when classes aren't beating you down?
@@ -1379,29 +1408,33 @@ export default function SharedForm({ role, onSubmit }) {
       )}
       {step === 6 && (
         <div className="space-y-4">
-          <textarea
-            name="expectations"
-            value={formData.expectations}
-            onChange={handleChange}
-            placeholder={
-              role === "mentor"
-                ? "What do you expect from your mentee?"
-                : "What do you expect from your mentor?"
-            }
-            className={`w-full border px-4 py-2 rounded ${errors.includes("expectations") ? "border-red-500" : ""}`}
-            rows="3"
-          />
+          <div className="relative">
+            <textarea
+              name="expectations"
+              value={formData.expectations}
+              onChange={handleChange}
+              placeholder={
+                role === "mentor"
+                  ? "What do you expect from your mentee?"
+                  : "What do you expect from your mentor?"
+              }
+              className={`w-full border px-4 py-2 rounded pr-20 ${errors.includes("expectations") ? "border-red-500" : ""}`}
+              rows="3"
+              maxLength="250"
+            />
+            <div className={`absolute bottom-2 right-2 text-sm pointer-events-none ${
+              formData.expectations.length > 225 ? 'text-red-500' : 
+              formData.expectations.length > 200 ? 'text-yellow-500' : 
+              'text-gray-500'
+            }`}>
+              {formData.expectations.length}/250
+            </div>
+          </div>
         </div>
       )}
       
       {step === 7 && (
-        <div className="space-y-4 relative">
-          {traitsLoading && (
-            <div className="absolute inset-0 bg-white bg-opacity-50 flex justify-center items-center z-20">
-              <div className="w-12 h-12 border-4 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
-            </div>
-          )}
-
+        <div className="space-y-4">
           <h3 className="text-xl font-semibold text-gray-800">
             Last minute things...
           </h3>
@@ -1513,7 +1546,7 @@ export default function SharedForm({ role, onSubmit }) {
                       ) && (
                           <li
                             key={`keep-${index}`}
-                            onMouseDown={async (e) => {
+                            onMouseDown={(e) => {
                               e.preventDefault();
                               setTraitClickInProgress(true);
                               handleTraitChange(
@@ -1522,42 +1555,6 @@ export default function SharedForm({ role, onSubmit }) {
                               );
                               setTraitSuggestions([]);
                               setActiveTraitIndex(null);
-
-                              const term = toTitleCase(
-                                traitObj?.raw || "",
-                              ).trim();
-
-                              if (!traitVectors[term]) {
-                                try {
-                                  setTraitsLoading(true);
-
-                                  const res = await axios.post(
-                                    `${import.meta.env.VITE_BACKEND_URL}/api/traits/add`,
-                                    { trait: term },
-                                  );
-                                  if (res.data.embedding) {
-                                    console.log(
-                                      `✅ "${term}" vectorized and saved.`,
-                                    );
-
-                                    setTraitVectors((prev) => ({
-                                      ...prev,
-                                      [term]: res.data.embedding,
-                                    }));
-
-                                    if (traitFuse) {
-                                      traitFuse.add(term);
-                                      console.log(
-                                        `✅ "${term}" added to Fuse suggestions.`,
-                                      );
-                                    }
-                                  }
-                                } catch (err) {
-                                  console.error("Error adding new trait:", err);
-                                } finally {
-                                  setTraitsLoading(false);
-                                }
-                              }
                             }}
                             className="px-4 py-2 text-sm text-gray-500 hover:bg-gray-50 cursor-pointer italic"
                           >
@@ -1586,15 +1583,25 @@ export default function SharedForm({ role, onSubmit }) {
               ? `Describe your ideal mentee in a few words.`
               : `Describe your ideal mentor in a few words.`}
           </p>
-          <textarea
-            name="idealMatchDescription"
-            value={formData.idealMatchDescription}
-            onChange={handleChange}
-            placeholder="My twin 🤪"
-            className={`w-full border px-4 py-2 rounded mt-4 ${errors.includes("idealMatchDescription") ? "border-red-500" : ""
-              }`}
-            rows="3"
-          />
+          <div className="relative">
+            <textarea
+              name="idealMatchDescription"
+              value={formData.idealMatchDescription}
+              onChange={handleChange}
+              placeholder="My twin 🤪"
+              className={`w-full border px-4 py-2 rounded mt-4 pr-20 ${errors.includes("idealMatchDescription") ? "border-red-500" : ""
+                }`}
+              rows="3"
+              maxLength="250"
+            />
+            <div className={`absolute bottom-2 right-2 text-sm pointer-events-none ${
+              formData.idealMatchDescription.length > 225 ? 'text-red-500' : 
+              formData.idealMatchDescription.length > 200 ? 'text-yellow-500' : 
+              'text-gray-500'
+            }`}>
+              {formData.idealMatchDescription.length}/250
+            </div>
+          </div>
         </div>
       )}
       {step === 8 && (
@@ -1653,24 +1660,20 @@ export default function SharedForm({ role, onSubmit }) {
         ) : step === 7 ? (
           <button
             type="button"
-            onClick={(e) => {
-              if (!validateStep(step)) return;
-
-              handleSubmit(e);
-              setShowConfetti(true);
-
-              setTimeout(() => {
-                setErrors([]);
-                setStep(8);
-              }, 50); // 50-100ms is enough for confetti to fire first
-            }}
-            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className={`px-4 py-2 rounded text-white ${
+              isSubmitting 
+                ? 'bg-gray-400 cursor-not-allowed' 
+                : 'bg-green-600 hover:bg-green-700'
+            }`}
           >
-            Submit
+            {isSubmitting ? 'Processing...' : 'Submit'}
           </button>
         ) : null}
       </div>
     </form>
+    </>
   );
   
 }

@@ -77,14 +77,14 @@ export default function Dashboard() {
   };
 
   const settingsConfig = [
-    { key: "major", label: "Major", explanation: 'Defaults baesed on user selection. If a mentor/mentee selects that they want a counterpart in their major, this will default to high and "no preference" to low.' },
-    { key: "gender", label: "Gender", explanation: 'Defaults baesed on user selection. If a mentor/mentee has a gender preference, this will default to high and "no preference" to low' },
+    { key: "major", label: "Major", explanation: 'Bidirectional matching considers BOTH mentor and mentee major preferences. When either party wants a major match, weight increases. Penalties apply when preferences are not satisfied.' },
+    { key: "gender", label: "Gender", explanation: 'Bidirectional matching considers BOTH mentor and mentee gender preferences. Maximum score when both preferences are satisfied, partial score for one-sided satisfaction, penalties for conflicts.' },
     { key: "hobbies", label: "Hobbies", explanation: "Set the weight that hobby matching should hold in matching." },
     { key: "musicalArtists", label: "Musical Taste", explanation: "Set the weight that musical profile  matching should hold in matching." },
     { key: "personalityWords", label: "Personality Words", explanation: "Set the weight that personality matching should hold in matching." },
     { key: "expectations", label: "Expectations/Ideal Match", explanation: "Each user submits their expectations for their counterpart as well as their ideal counterpart." },
     { key: "organizations", label: "Org Involvement", explanation: "Set the weight that org involvement matching should hold in matching." },
-    { key: "meetingFrequency", label: "Meeting Frequency", explanation: "Users enter how often they hope to meet with their counterparts." },
+    { key: "meetingFrequency", label: "Meeting Frequency", explanation: "Enhanced compatibility scoring: exact matches get full points, similar frequencies (Weekly↔Bi-Weekly) get partial points, incompatible frequencies (Weekly↔Monthly) get minimal points." },
   ];
   
   /*
@@ -346,10 +346,10 @@ const mentees = data.filter((entry) => entry.role?.toLowerCase() === "mentee");
         <p className="text-sm text-gray-500 mt-1">
           {isAutoCalculated ? (
             <>
-              <span className="italic">Automatically determined by user input.</span>{" "}
+              <span className="italic">Bidirectional matching considers both parties.</span>{" "}
               {key === "major"
-                ? 'If a user wants a match in their major, weight is High. If not, weight is Low.'
-                : 'If a user selects a preferred gender, weight is High. If "No preference" is selected, weight in Low.'}
+                ? 'Weight scales based on how many parties want major matches. Penalties apply when preferences conflict.'
+                : 'Weight scales based on preference strength from both mentor and mentee. Higher scores for mutual satisfaction.'}
             </>
           ) : (
             explanation

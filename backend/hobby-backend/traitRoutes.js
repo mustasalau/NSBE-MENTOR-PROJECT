@@ -38,7 +38,7 @@ router.post("/add", async (req, res) => {
     });
   }
 
-  const vec = await vectorizeAndSave(titleCaseTrait, traitVectorPath, traitVectors, "This is a personality trait: ");
+  const vec = await vectorizeAndSave(titleCaseTrait, traitVectorPath, traitVectors, "This is a personal trait or characteristic: ");
   if (!vec) {
     return res.status(500).json({ error: "Failed to generate embedding." });
   }
