@@ -55,6 +55,13 @@ export function arrayToVectorString(array) {
   }
   return `[${array.join(',')}]`;
 }
+export function arrayToVectorString(array) {
+  if (!Array.isArray(array) || array.length !== 1536) {
+    throw new Error('Vector must be an array of 1536 numbers');
+  }
+  return `[${array.join(',')}]`;
+}
+
 
 // Update vectorizeText to support hobby and trait types
 export async function vectorizeText(text, textType, role) {
@@ -81,3 +88,5 @@ export async function vectorizeText(text, textType, role) {
   const embedding = await getEmbedding(`${promptPrefix}${text}`);
   return embedding;
 }
+
+

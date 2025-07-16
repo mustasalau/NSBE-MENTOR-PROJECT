@@ -7,8 +7,7 @@ import dotenv from "dotenv";
 import pg from "pg";
 import cookieParser from "cookie-parser";
 
-import { vectorizeAndSave, loadVectors, vectorizeText } from "./openAIhelpers.js";
-import traitRoutes from "./traitRoutes.js";
+import { vectorizeAndSave, loadVectors, vectorizeText, arrayToVectorString } from "./openAIhelpers.js";import traitRoutes from "./traitRoutes.js";
 import spotifyRoutes from "./spotifyRoutes.js";
 
 dotenv.config();
@@ -531,12 +530,6 @@ function averageVector(vectors) {
 }
 
 // Convert array to pgvector string format
-export function arrayToVectorString(array) {
-  if (!Array.isArray(array) || array.length !== 1536) {
-    throw new Error('Vector must be an array of 1536 numbers');
-  }
-  return `[${array.join(',')}]`;
-}
 
 
 // ✅ EXISTING: For JSONB vectors (expectations/ideal match)
