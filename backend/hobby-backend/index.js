@@ -321,12 +321,13 @@ app.post("/api/submit", strictRateLimit, async (req, res) => {
       idealMatchVector = await vectorizeText(idealMatchDescription, "idealMatch", role);
     }
 
-    // ✅ Complete rewrite of vector storage around lines 320-370
+    // ✅ Update around lines 320-370 - Use proper PostgreSQL vector array formatting
 
     // Vectorize hobbies using CACHED vectors
-    let hobbyVectorArrays = [];
+    let hobbyVectorArray = null;
     if (hobbies && hobbies.length > 0) {
       console.log(`Getting cached vectors for hobbies:`, hobbies);
+      const hobbyVectorStrings = [];
       
       for (const hobby of hobbies) {
         if (hobby && hobby.trim()) {
@@ -339,16 +340,23 @@ app.post("/api/submit", strictRateLimit, async (req, res) => {
           }
           
           if (embeddingArray && embeddingArray.length === 1536) {
-            hobbyVectorArrays.push(embeddingArray); // ✅ Push raw array, not string
+            // ✅ Format each vector properly
+            hobbyVectorStrings.push(`[${embeddingArray.join(',')}]`);
           }
         }
+      }
+      
+      if (hobbyVectorStrings.length > 0) {
+        // ✅ Create proper PostgreSQL array literal
+        hobbyVectorArray = `{${hobbyVectorStrings.join(',')}}`;
       }
     }
 
     // Vectorize traits using CACHED vectors  
-    let traitVectorArrays = [];
+    let traitVectorArray = null;
     if (personalityWords && personalityWords.length > 0) {
       console.log(`Getting cached vectors for traits:`, personalityWords.map(p => p.raw));
+      const traitVectorStrings = [];
       
       for (const trait of personalityWords) {
         if (trait.raw && trait.raw.trim()) {
@@ -361,13 +369,19 @@ app.post("/api/submit", strictRateLimit, async (req, res) => {
           }
           
           if (embeddingArray && embeddingArray.length === 1536) {
-            traitVectorArrays.push(embeddingArray); // ✅ Push raw array, not string
+            // ✅ Format each vector properly  
+            traitVectorStrings.push(`[${embeddingArray.join(',')}]`);
           }
         }
       }
+      
+      if (traitVectorStrings.length > 0) {
+        // ✅ Create proper PostgreSQL array literal
+        traitVectorArray = `{${traitVectorStrings.join(',')}}`;
+      }
     }
 
-    // ✅ Use pg's array handling instead of manual formatting
+    // ✅ Use the formatted strings (not JSON.stringify)
     await pool.query(
       `INSERT INTO mentor_mentee_submissions (
         role, first_name, last_name, email, personal_email, student_id,
@@ -396,8 +410,8 @@ app.post("/api/submit", strictRateLimit, async (req, res) => {
         JSON.stringify(musicalArtists),
         expectationsVector ? JSON.stringify(expectationsVector) : null,
         idealMatchVector ? JSON.stringify(idealMatchVector) : null,
-        hobbyVectorArrays.length > 0 ? JSON.stringify(hobbyVectorArrays) : null, // ✅ JSON approach
-        traitVectorArrays.length > 0 ? JSON.stringify(traitVectorArrays) : null  // ✅ JSON approach
+        hobbyVectorArray,     // ✅ Use string literal, not JSON
+        traitVectorArray      // ✅ Use string literal, not JSON
       ]
     );
 
