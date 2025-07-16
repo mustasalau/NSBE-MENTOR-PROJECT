@@ -321,67 +321,53 @@ app.post("/api/submit", strictRateLimit, async (req, res) => {
       idealMatchVector = await vectorizeText(idealMatchDescription, "idealMatch", role);
     }
 
-    // ✅ Update around lines 320-355 - Use cached vectors instead of fresh API calls
+    // ✅ Complete rewrite of vector storage around lines 320-370
 
     // Vectorize hobbies using CACHED vectors
-    let hobbyVectorArray = null;
+    let hobbyVectorArrays = [];
     if (hobbies && hobbies.length > 0) {
       console.log(`Getting cached vectors for hobbies:`, hobbies);
-      const hobbyVectorStrings = [];
       
       for (const hobby of hobbies) {
         if (hobby && hobby.trim()) {
-          const hobbyKey = hobby.trim();
+          const hobbyKey = hobby.trim().toLowerCase(); // ✅ Force lowercase
           
-          // ✅ Try cached vector first
           let embeddingArray = hobbyVectors[hobbyKey];
-          
-          // ✅ If not cached, vectorize and cache it
           if (!embeddingArray) {
             console.log(`Vectorizing new hobby: "${hobbyKey}"`);
             embeddingArray = await vectorizeAndSave(hobbyKey, hobbyVectorPath, hobbyVectors, "This is a hobby or leisure activity someone might enjoy: ");
           }
           
           if (embeddingArray && embeddingArray.length === 1536) {
-            hobbyVectorStrings.push(arrayToVectorString(embeddingArray));
+            hobbyVectorArrays.push(embeddingArray); // ✅ Push raw array, not string
           }
         }
-      }
-      
-      if (hobbyVectorStrings.length > 0) {
-        hobbyVectorArray = `{${hobbyVectorStrings.join(',')}}`;
       }
     }
 
     // Vectorize traits using CACHED vectors  
-    let traitVectorArray = null;
+    let traitVectorArrays = [];
     if (personalityWords && personalityWords.length > 0) {
       console.log(`Getting cached vectors for traits:`, personalityWords.map(p => p.raw));
-      const traitVectorStrings = [];
       
       for (const trait of personalityWords) {
         if (trait.raw && trait.raw.trim()) {
           const traitKey = trait.raw.trim().toLowerCase(); // ✅ Force lowercase
           
-          // ✅ Try cached vector (lowercase key)
           let embeddingArray = traitVectors[traitKey];
-          
           if (!embeddingArray) {
             console.log(`Vectorizing new trait: "${traitKey}"`);
             embeddingArray = await vectorizeAndSave(traitKey, traitVectorPath, traitVectors, "This is a personal trait or characteristic: ");
           }
           
           if (embeddingArray && embeddingArray.length === 1536) {
-            traitVectorStrings.push(arrayToVectorString(embeddingArray));
+            traitVectorArrays.push(embeddingArray); // ✅ Push raw array, not string
           }
         }
       }
-      
-      if (traitVectorStrings.length > 0) {
-        traitVectorArray = `{${traitVectorStrings.join(',')}}`;
-      }
     }
 
+    // ✅ Use pg's array handling instead of manual formatting
     await pool.query(
       `INSERT INTO mentor_mentee_submissions (
         role, first_name, last_name, email, personal_email, student_id,
@@ -402,16 +388,16 @@ app.post("/api/submit", strictRateLimit, async (req, res) => {
         major, gender, year, pairGenderPreference, meetingFrequency,
         hobbies,
         organizations,
-        personalityWords.map((p) => p.raw),
+        personalityWords.map((p) => p.raw.toLowerCase()), // ✅ Force lowercase
         expectations,
         idealMatchDescription,
         menteeInMajor,
         openToMultiple,
         JSON.stringify(musicalArtists),
-        expectationsVector ? JSON.stringify(expectationsVector) : null,  // ✅ EXISTING: JSONB
-        idealMatchVector ? JSON.stringify(idealMatchVector) : null,      // ✅ EXISTING: JSONB
-        hobbyVectorArray,                                                // ✅ NEW: Native vector
-        traitVectorArray                                                 // ✅ NEW: Native vector
+        expectationsVector ? JSON.stringify(expectationsVector) : null,
+        idealMatchVector ? JSON.stringify(idealMatchVector) : null,
+        hobbyVectorArrays.length > 0 ? JSON.stringify(hobbyVectorArrays) : null, // ✅ JSON approach
+        traitVectorArrays.length > 0 ? JSON.stringify(traitVectorArrays) : null  // ✅ JSON approach
       ]
     );
 
