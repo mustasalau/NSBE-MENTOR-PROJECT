@@ -332,7 +332,7 @@ app.post("/api/submit", strictRateLimit, async (req, res) => {
       }
       
       if (hobbyVectorStrings.length > 0) {
-        hobbyVectorArray = `{${hobbyVectorStrings.join(',')}}`;
+        hobbyVectorArray = `{${hobbyVectorStrings.map(v => `"${v}"`).join(',')}}`;
       }
     }
 
@@ -352,7 +352,7 @@ app.post("/api/submit", strictRateLimit, async (req, res) => {
       }
       
       if (traitVectorStrings.length > 0) {
-        traitVectorArray = `{${traitVectorStrings.join(',')}}`;
+        traitVectorArray = `{${traitVectorStrings.map(v => `"${v}"`).join(',')}}`;
       }
     }
 
