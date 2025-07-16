@@ -430,9 +430,15 @@ export default function SharedForm({ role, onSubmit }) {
       // Step 1: Vectorize unknown hobbies
       const unknownHobbies = formData.hobbies
         .map((h) => h.trim())
-        .filter((h) => h && !hobbyVectors[h] && 
-          !fuse.search(h).some((r) => r.item.toLowerCase() === h.toLowerCase())
-        );
+        .filter((h) => {
+          if (!h) return false;
+          
+          // ✅ Convert to Title Case for cache lookup (matches backend)
+          const titleCaseHobby = h.replace(/\b\w/g, (c) => c.toUpperCase());
+          
+          return !hobbyVectors[titleCaseHobby] && 
+            !fuse.search(h).some((r) => r.item.toLowerCase() === h.toLowerCase());
+        });
 
       if (unknownHobbies.length > 0) {
         console.log("🔄 Vectorizing unknown hobbies:", unknownHobbies);
