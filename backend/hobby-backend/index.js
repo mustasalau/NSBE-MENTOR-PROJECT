@@ -731,13 +731,13 @@ function calculateMusicalCompatibility(mentor, mentee, weight) {
   };
 }
 
-function optimizeAssignments(mentees, mentors, settings) {
+async function optimizeAssignments(mentees, mentors, settings) {
   // Create all possible mentor-mentee pairs with scores
   const allPairs = [];
   
-  mentees.forEach(mentee => {
-    mentors.forEach(mentor => {
-      const result = calculateSimilarity(mentor, mentee, settings);
+  for (const mentee of mentees) {
+    for (const mentor of mentors) {
+      const result = await calculateSimilarity(mentor, mentee, settings);
       allPairs.push({
         menteeId: mentee.id,
         mentorId: mentor.id,
@@ -746,8 +746,8 @@ function optimizeAssignments(mentees, mentors, settings) {
         mentee: mentee,
         mentor: mentor
       });
-    });
-  });
+    }
+  } 
 
   // Sort pairs by score (highest first)
   allPairs.sort((a, b) => b.score - a.score);
@@ -820,7 +820,7 @@ function optimizeAssignments(mentees, mentors, settings) {
   };
 }
 
-function calculateSimilarity(mentor, mentee, weights) {
+async function calculateSimilarity(mentor, mentee, weights) {
   let score = 0;
   let details = {}; // For debugging
 
@@ -1034,7 +1034,7 @@ app.get("/api/generate-matches", async (req, res) => {
     }
 
     // Use capacity-aware assignment optimization
-    const assignmentResult = optimizeAssignments(mentees, mentors, settings);
+    const assignmentResult = await optimizeAssignments(mentees, mentors, settings);
     
     // Convert mentor assignments to response format
     const mentorMatches = [];
