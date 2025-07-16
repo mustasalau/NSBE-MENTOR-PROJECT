@@ -349,7 +349,7 @@ app.post("/api/submit", strictRateLimit, async (req, res) => {
       }
       
       if (hobbyVectorStrings.length > 0) {
-        hobbyVectorArray = `{${hobbyVectorStrings.map(v => `"${v}"`).join(',')}}`;
+        hobbyVectorArray = `{${hobbyVectorStrings.join(',')}}`;
       }
     }
 
@@ -361,12 +361,11 @@ app.post("/api/submit", strictRateLimit, async (req, res) => {
       
       for (const trait of personalityWords) {
         if (trait.raw && trait.raw.trim()) {
-          const traitKey = trait.raw.trim();
+          const traitKey = trait.raw.trim().toLowerCase(); // ✅ Force lowercase
           
-          // ✅ Try cached vector first
+          // ✅ Try cached vector (lowercase key)
           let embeddingArray = traitVectors[traitKey];
           
-          // ✅ If not cached, vectorize and cache it
           if (!embeddingArray) {
             console.log(`Vectorizing new trait: "${traitKey}"`);
             embeddingArray = await vectorizeAndSave(traitKey, traitVectorPath, traitVectors, "This is a personal trait or characteristic: ");
@@ -379,7 +378,7 @@ app.post("/api/submit", strictRateLimit, async (req, res) => {
       }
       
       if (traitVectorStrings.length > 0) {
-        traitVectorArray = `{${traitVectorStrings.map(v => `"${v}"`).join(',')}}`;
+        traitVectorArray = `{${traitVectorStrings.join(',')}}`;
       }
     }
 
