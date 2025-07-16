@@ -316,15 +316,27 @@ app.post("/api/submit", strictRateLimit, async (req, res) => {
       idealMatchVector = await vectorizeText(idealMatchDescription, "idealMatch", role);
     }
 
-    // ✅ NEW: Vectorize hobbies (native vectors)
+    // ✅ Update around lines 320-355 - Use cached vectors instead of fresh API calls
+
+    // Vectorize hobbies using CACHED vectors
     let hobbyVectorArray = null;
     if (hobbies && hobbies.length > 0) {
-      console.log(`Vectorizing hobbies for ${role}:`, hobbies);
+      console.log(`Getting cached vectors for hobbies:`, hobbies);
       const hobbyVectorStrings = [];
       
       for (const hobby of hobbies) {
         if (hobby && hobby.trim()) {
-          const embeddingArray = await vectorizeText(hobby.trim(), "hobby", role);
+          const hobbyKey = hobby.trim();
+          
+          // ✅ Try cached vector first
+          let embeddingArray = hobbyVectors[hobbyKey];
+          
+          // ✅ If not cached, vectorize and cache it
+          if (!embeddingArray) {
+            console.log(`Vectorizing new hobby: "${hobbyKey}"`);
+            embeddingArray = await vectorizeAndSave(hobbyKey, hobbyVectorPath, hobbyVectors, "This is a hobby or leisure activity someone might enjoy: ");
+          }
+          
           if (embeddingArray && embeddingArray.length === 1536) {
             hobbyVectorStrings.push(arrayToVectorString(embeddingArray));
           }
@@ -336,15 +348,25 @@ app.post("/api/submit", strictRateLimit, async (req, res) => {
       }
     }
 
-    // ✅ NEW: Vectorize traits (native vectors)
+    // Vectorize traits using CACHED vectors  
     let traitVectorArray = null;
     if (personalityWords && personalityWords.length > 0) {
-      console.log(`Vectorizing traits for ${role}:`, personalityWords.map(p => p.raw));
+      console.log(`Getting cached vectors for traits:`, personalityWords.map(p => p.raw));
       const traitVectorStrings = [];
       
       for (const trait of personalityWords) {
         if (trait.raw && trait.raw.trim()) {
-          const embeddingArray = await vectorizeText(trait.raw.trim(), "trait", role);
+          const traitKey = trait.raw.trim();
+          
+          // ✅ Try cached vector first
+          let embeddingArray = traitVectors[traitKey];
+          
+          // ✅ If not cached, vectorize and cache it
+          if (!embeddingArray) {
+            console.log(`Vectorizing new trait: "${traitKey}"`);
+            embeddingArray = await vectorizeAndSave(traitKey, traitVectorPath, traitVectors, "This is a personal trait or characteristic: ");
+          }
+          
           if (embeddingArray && embeddingArray.length === 1536) {
             traitVectorStrings.push(arrayToVectorString(embeddingArray));
           }
