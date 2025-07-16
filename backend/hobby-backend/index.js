@@ -360,7 +360,7 @@ app.post("/api/submit", strictRateLimit, async (req, res) => {
       `INSERT INTO mentor_mentee_submissions (
         role, first_name, last_name, email, personal_email, student_id,
         major, gender, year, pair_gender_preference, meeting_frequency,
-        hobbies, musical_artists, organizations, personality_words,
+        hobbies, organizations, personality_words,
         expectations, ideal_match_description, mentee_in_major, open_to_multiple,
         musical_artists_json, 
         expectations_vector, ideal_match_vector,
