@@ -321,17 +321,16 @@ app.post("/api/submit", strictRateLimit, async (req, res) => {
       idealMatchVector = await vectorizeText(idealMatchDescription, "idealMatch", role);
     }
 
-    // ✅ Update around lines 320-370 - Use proper PostgreSQL vector array formatting
+    // ✅ Much simpler approach - store raw arrays as JSON
 
     // Vectorize hobbies using CACHED vectors
-    let hobbyVectorArray = null;
+    let hobbyVectorArrays = [];
     if (hobbies && hobbies.length > 0) {
       console.log(`Getting cached vectors for hobbies:`, hobbies);
-      const hobbyVectorStrings = [];
       
       for (const hobby of hobbies) {
         if (hobby && hobby.trim()) {
-          const hobbyKey = hobby.trim().toLowerCase(); // ✅ Force lowercase
+          const hobbyKey = hobby.trim().toLowerCase();
           
           let embeddingArray = hobbyVectors[hobbyKey];
           if (!embeddingArray) {
@@ -340,27 +339,20 @@ app.post("/api/submit", strictRateLimit, async (req, res) => {
           }
           
           if (embeddingArray && embeddingArray.length === 1536) {
-            // ✅ Format each vector properly
-            hobbyVectorStrings.push(`[${embeddingArray.join(',')}]`);
+            hobbyVectorArrays.push(embeddingArray); // ✅ Just push the raw array
           }
         }
-      }
-      
-      if (hobbyVectorStrings.length > 0) {
-        // ✅ Create proper PostgreSQL array literal
-        hobbyVectorArray = `{${hobbyVectorStrings.join(',')}}`;
       }
     }
 
     // Vectorize traits using CACHED vectors  
-    let traitVectorArray = null;
+    let traitVectorArrays = [];
     if (personalityWords && personalityWords.length > 0) {
       console.log(`Getting cached vectors for traits:`, personalityWords.map(p => p.raw));
-      const traitVectorStrings = [];
       
       for (const trait of personalityWords) {
         if (trait.raw && trait.raw.trim()) {
-          const traitKey = trait.raw.trim().toLowerCase(); // ✅ Force lowercase
+          const traitKey = trait.raw.trim().toLowerCase();
           
           let embeddingArray = traitVectors[traitKey];
           if (!embeddingArray) {
@@ -369,19 +361,13 @@ app.post("/api/submit", strictRateLimit, async (req, res) => {
           }
           
           if (embeddingArray && embeddingArray.length === 1536) {
-            // ✅ Format each vector properly  
-            traitVectorStrings.push(`[${embeddingArray.join(',')}]`);
+            traitVectorArrays.push(embeddingArray); // ✅ Just push the raw array
           }
         }
       }
-      
-      if (traitVectorStrings.length > 0) {
-        // ✅ Create proper PostgreSQL array literal
-        traitVectorArray = `{${traitVectorStrings.join(',')}}`;
-      }
     }
 
-    // ✅ Use the formatted strings (not JSON.stringify)
+    // ✅ Store as JSON - no complex formatting needed
     await pool.query(
       `INSERT INTO mentor_mentee_submissions (
         role, first_name, last_name, email, personal_email, student_id,
@@ -402,7 +388,7 @@ app.post("/api/submit", strictRateLimit, async (req, res) => {
         major, gender, year, pairGenderPreference, meetingFrequency,
         hobbies,
         organizations,
-        personalityWords.map((p) => p.raw.toLowerCase()), // ✅ Force lowercase
+        personalityWords.map((p) => p.raw.toLowerCase()),
         expectations,
         idealMatchDescription,
         menteeInMajor,
@@ -410,8 +396,8 @@ app.post("/api/submit", strictRateLimit, async (req, res) => {
         JSON.stringify(musicalArtists),
         expectationsVector ? JSON.stringify(expectationsVector) : null,
         idealMatchVector ? JSON.stringify(idealMatchVector) : null,
-        hobbyVectorArray,     // ✅ Use string literal, not JSON
-        traitVectorArray      // ✅ Use string literal, not JSON
+        hobbyVectorArrays.length > 0 ? JSON.stringify(hobbyVectorArrays) : null, // ✅ Simple JSON
+        traitVectorArrays.length > 0 ? JSON.stringify(traitVectorArrays) : null   // ✅ Simple JSON
       ]
     );
 
