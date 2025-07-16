@@ -375,7 +375,6 @@ app.post("/api/submit", strictRateLimit, async (req, res) => {
         role, firstName, lastName, email, personalEmail, studentId,
         major, gender, year, pairGenderPreference, meetingFrequency,
         hobbies,
-        musicalArtists.map((m) => `${m.displayName} (${m.genres.join(', ')})`),
         organizations,
         personalityWords.map((p) => p.raw),
         expectations,
