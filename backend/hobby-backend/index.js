@@ -1391,4 +1391,111 @@ app.get("/api/assignments", async (req, res) => {
   }
 });
 
+app.get('/api/test/trait-vectors', async (req, res) => {
+  try {
+    console.log('\n=== TRAIT VECTOR COMPARISON TEST ===\n');
+    
+    // 1. Load static traits list
+    const staticTraits = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "src", "data", "traits.json")));
+    console.log(`📋 Static traits count: ${staticTraits.length}`);
+    console.log(`📋 First 5 static traits:`, staticTraits.slice(0, 5));
+    
+    // 2. Load cached trait vectors
+    const cachedTraitKeys = Object.keys(traitVectors);
+    console.log(`💾 Cached trait vectors count: ${cachedTraitKeys.length}`);
+    console.log(`💾 First 5 cached traits:`, cachedTraitKeys.slice(0, 5));
+    
+    // 3. Query database for user trait data
+    const dbResult = await pool.query(`
+      SELECT personality_words, trait_vectors 
+      FROM mentor_mentee_submissions 
+      WHERE personality_words IS NOT NULL 
+      AND array_length(personality_words, 1) > 0 
+      LIMIT 5
+    `);
+    
+    console.log(`🗃️ Database submissions with traits: ${dbResult.rows.length}`);
+    
+    const dbTraits = new Set();
+    dbResult.rows.forEach(row => {
+      if (row.personality_words) {
+        row.personality_words.forEach(trait => dbTraits.add(trait));
+      }
+    });
+    
+    console.log(`🗃️ Unique traits in database: ${dbTraits.size}`);
+    console.log(`🗃️ Sample DB traits:`, Array.from(dbTraits).slice(0, 5));
+    
+    // 4. Find mismatches
+    const mismatches = {
+      inDbNotInStatic: Array.from(dbTraits).filter(trait => !staticTraits.includes(trait)),
+      inStaticNotCached: staticTraits.filter(trait => !cachedTraitKeys.includes(trait)),
+      inDbNotCached: Array.from(dbTraits).filter(trait => !cachedTraitKeys.includes(trait)),
+      inCachedNotInStatic: cachedTraitKeys.filter(trait => !staticTraits.includes(trait))
+    };
+    
+    console.log('\n=== MISMATCHES FOUND ===');
+    console.log(`❌ Traits in DB but not in static list: ${mismatches.inDbNotInStatic.length}`);
+    if (mismatches.inDbNotInStatic.length > 0) {
+      console.log(`   Examples:`, mismatches.inDbNotInStatic.slice(0, 10));
+    }
+    
+    console.log(`❌ Traits in static list but not cached: ${mismatches.inStaticNotCached.length}`);
+    if (mismatches.inStaticNotCached.length > 0) {
+      console.log(`   Examples:`, mismatches.inStaticNotCached.slice(0, 10));
+    }
+    
+    console.log(`❌ Traits in DB but not cached: ${mismatches.inDbNotCached.length}`);
+    if (mismatches.inDbNotCached.length > 0) {
+      console.log(`   Examples:`, mismatches.inDbNotCached.slice(0, 10));
+    }
+    
+    console.log(`❌ Traits cached but not in static list: ${mismatches.inCachedNotInStatic.length}`);
+    if (mismatches.inCachedNotInStatic.length > 0) {
+      console.log(`   Examples:`, mismatches.inCachedNotInStatic.slice(0, 10));
+    }
+    
+    // 5. Vector validation for DB entries
+    const vectorIssues = [];
+    dbResult.rows.forEach((row, index) => {
+      if (row.trait_vectors) {
+        console.log(`🔍 Row ${index + 1} traits:`, row.personality_words);
+        console.log(`🔍 Row ${index + 1} vector count:`, row.trait_vectors ? row.trait_vectors.length : 0);
+        
+        if (row.personality_words.length !== (row.trait_vectors ? row.trait_vectors.length : 0)) {
+          vectorIssues.push({
+            rowIndex: index + 1,
+            traits: row.personality_words,
+            expectedVectors: row.personality_words.length,
+            actualVectors: row.trait_vectors ? row.trait_vectors.length : 0
+          });
+        }
+      }
+    });
+    
+    console.log(`❌ Vector count mismatches: ${vectorIssues.length}`);
+    vectorIssues.forEach(issue => {
+      console.log(`   Row ${issue.rowIndex}: Expected ${issue.expectedVectors} vectors, got ${issue.actualVectors}`);
+      console.log(`   Traits: ${issue.traits.join(', ')}`);
+    });
+    
+    res.json({
+      staticTraitsCount: staticTraits.length,
+      cachedTraitsCount: cachedTraitKeys.length,
+      dbTraitsCount: dbTraits.size,
+      mismatches,
+      vectorIssues,
+      sampleData: {
+        staticTraits: staticTraits.slice(0, 5),
+        cachedTraits: cachedTraitKeys.slice(0, 5),
+        dbTraits: Array.from(dbTraits).slice(0, 5)
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Test failed:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
