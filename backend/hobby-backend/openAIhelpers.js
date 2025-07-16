@@ -48,13 +48,7 @@ export async function vectorizeAndSave(term, filePath, vectors, promptPrefix = "
   return embedding;
 }
 
-// Convert array to pgvector string format
-export function arrayToVectorString(array) {
-  if (!Array.isArray(array) || array.length !== 1536) {
-    throw new Error('Vector must be an array of 1536 numbers');
-  }
-  return `[${array.join(',')}]`;
-}
+// Convert array to pgvector string for pgvector
 export function arrayToVectorString(array) {
   if (!Array.isArray(array) || array.length !== 1536) {
     throw new Error('Vector must be an array of 1536 numbers');
