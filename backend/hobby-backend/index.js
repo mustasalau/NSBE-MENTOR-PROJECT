@@ -1381,6 +1381,105 @@ app.get("/api/assignments", async (req, res) => {
   }
 });
 
+// Duplicate detection endpoint
+app.get("/api/duplicates", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      WITH duplicate_student_ids AS (
+        SELECT student_id, COUNT(*) as count, 
+               ARRAY_AGG(id ORDER BY created_at) as ids,
+               ARRAY_AGG(first_name ORDER BY created_at) as first_names,
+               ARRAY_AGG(last_name ORDER BY created_at) as last_names,
+               ARRAY_AGG(created_at ORDER BY created_at) as timestamps,
+               ARRAY_AGG(role ORDER BY created_at) as roles
+        FROM mentor_mentee_submissions 
+        WHERE student_id IS NOT NULL AND student_id != ''
+        GROUP BY student_id 
+        HAVING COUNT(*) > 1
+      ),
+      duplicate_names AS (
+        SELECT LOWER(TRIM(first_name)) as first_name_lower, 
+               LOWER(TRIM(last_name)) as last_name_lower, 
+               COUNT(*) as count,
+               ARRAY_AGG(id ORDER BY created_at) as ids,
+               ARRAY_AGG(first_name ORDER BY created_at) as first_names,
+               ARRAY_AGG(last_name ORDER BY created_at) as last_names,
+               ARRAY_AGG(student_id ORDER BY created_at) as student_ids,
+               ARRAY_AGG(created_at ORDER BY created_at) as timestamps,
+               ARRAY_AGG(role ORDER BY created_at) as roles
+        FROM mentor_mentee_submissions 
+        WHERE first_name IS NOT NULL AND last_name IS NOT NULL 
+          AND TRIM(first_name) != '' AND TRIM(last_name) != ''
+        GROUP BY LOWER(TRIM(first_name)), LOWER(TRIM(last_name))
+        HAVING COUNT(*) > 1
+      ),
+      combined_duplicates AS (
+        SELECT 'student_id' as duplicate_type, student_id as identifier, ids, first_names, last_names, timestamps, roles, 
+               NULL as student_ids
+        FROM duplicate_student_ids
+        UNION ALL
+        SELECT 'name' as duplicate_type, 
+               first_name_lower || ' ' || last_name_lower as identifier, 
+               ids, first_names, last_names, timestamps, roles, student_ids
+        FROM duplicate_names
+        WHERE NOT EXISTS (
+          SELECT 1 FROM duplicate_student_ids 
+          WHERE duplicate_student_ids.ids && duplicate_names.ids
+        )
+      )
+      SELECT * FROM combined_duplicates ORDER BY duplicate_type, identifier
+    `);
+
+    const duplicates = result.rows.map(row => ({
+      type: row.duplicate_type,
+      identifier: row.identifier,
+      submissions: row.ids.map((id, index) => ({
+        id: id,
+        firstName: row.first_names[index],
+        lastName: row.last_names[index],
+        studentId: row.student_ids ? row.student_ids[index] : row.identifier,
+        timestamp: row.timestamps[index],
+        role: row.roles[index]
+      }))
+    }));
+
+    res.json({
+      hasDuplicates: duplicates.length > 0,
+      duplicates: duplicates,
+      count: duplicates.length
+    });
+
+  } catch (err) {
+    console.error("Error fetching duplicates:", err);
+    res.status(500).json({ error: "Failed to fetch duplicates" });
+  }
+});
+
+// Delete submission endpoint
+app.delete("/api/submission/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await pool.query(
+      "DELETE FROM mentor_mentee_submissions WHERE id = $1 RETURNING *",
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Submission not found" });
+    }
+
+    res.json({ 
+      message: "Submission deleted successfully",
+      deleted: result.rows[0]
+    });
+
+  } catch (err) {
+    console.error("Error deleting submission:", err);
+    res.status(500).json({ error: "Failed to delete submission" });
+  }
+});
+
 app.get('/api/test/trait-vectors', async (req, res) => {
   try {
     console.log('\n=== TRAIT VECTOR COMPARISON TEST ===\n');

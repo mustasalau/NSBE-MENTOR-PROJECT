@@ -4,6 +4,7 @@ import MentorForm from './pages/MentorForm.jsx';
 import MenteeForm from './pages/MenteeForm.jsx';
 import MatchingPage from './pages/MatchingPage.jsx';
 import Dashboard from './pages/Dashboard.jsx';
+import DuplicatesPage from './pages/DuplicatesPage.jsx';
 
 
 
@@ -16,6 +17,7 @@ export default function App() {
       <Route path="/mentee" element={<MenteeForm />} />
       <Route path="/matching" element={<MatchingPage />} />
       <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/duplicates" element={<DuplicatesPage />} />
     </Routes>
   );
 }

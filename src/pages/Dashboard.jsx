@@ -3,6 +3,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import CountUp from "react-countup";
+import DuplicateAlert from "../components/DuplicateAlert";
 
 const COLORS = ["#4F46E5", "#60A5FA"];
 
@@ -224,6 +225,7 @@ const mentees = data.filter((entry) => entry.role?.toLowerCase() === "mentee");
 
   return (
   <div className="min-h-screen bg-blue-50 relative p-6">
+    <DuplicateAlert />
     <a href="/">
       <img
         src="/pictures/nsbelogo.png"
