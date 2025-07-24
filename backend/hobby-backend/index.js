@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import pg from "pg";
 import cookieParser from "cookie-parser";
+import * as XLSX from "xlsx";
 
 // Debug utility - only logs in development
 const debugLog = (...args) => {
@@ -319,6 +320,161 @@ app.get("/api/submissions", async (req, res) => {
   } catch (err) {
     console.error("Failed to fetch submissions:", err);
     res.status(500).json({ error: "Failed to fetch submissions" });
+  }
+});
+
+// Export submissions to XLSX
+app.get("/api/export/submissions", async (req, res) => {
+  try {
+    debugLog("📊 Exporting submissions to XLSX...");
+    
+    const result = await pool.query(`
+      SELECT 
+        first_name as "First Name",
+        last_name as "Last Name", 
+        role as "Role",
+        major as "Major",
+        gender as "Gender",
+        email as "PSU Email",
+        personal_email as "Personal Email",
+        student_id as "Student ID",
+        year as "Year",
+        meeting_frequency as "Meeting Frequency",
+        created_at as "Submission Date"
+      FROM mentor_mentee_submissions 
+      ORDER BY created_at DESC
+    `);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "No submissions found to export" });
+    }
+
+    // Create workbook and worksheet
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(result.rows);
+
+    // Set column widths for better readability
+    const colWidths = [
+      { wch: 15 }, // First Name
+      { wch: 15 }, // Last Name
+      { wch: 10 }, // Role
+      { wch: 25 }, // Major
+      { wch: 10 }, // Gender
+      { wch: 25 }, // PSU Email
+      { wch: 25 }, // Personal Email
+      { wch: 12 }, // Student ID
+      { wch: 8 },  // Year
+      { wch: 18 }, // Meeting Frequency
+      { wch: 20 }  // Submission Date
+    ];
+    worksheet['!cols'] = colWidths;
+
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Submissions");
+
+    // Generate XLSX buffer
+    const xlsxBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+    // Set headers for file download
+    const timestamp = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const filename = `NSBE_Submissions_${timestamp}.xlsx`;
+    
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', xlsxBuffer.length);
+
+    debugLog(`✅ Exported ${result.rows.length} submissions to ${filename}`);
+    res.send(xlsxBuffer);
+
+  } catch (err) {
+    console.error("Failed to export submissions:", err);
+    res.status(500).json({ error: "Failed to export submissions", details: err.message });
+  }
+});
+
+// Export approved matches to XLSX
+app.get("/api/export/approved-matches", async (req, res) => {
+  try {
+    debugLog("📊 Exporting approved matches to XLSX...");
+    
+    const result = await pool.query(`
+      SELECT 
+        id,
+        mentor_data,
+        mentee_data,
+        match_score,
+        approved_at,
+        approved_by
+      FROM approved_matches 
+      ORDER BY approved_at DESC
+    `);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "No approved matches found to export" });
+    }
+
+    // Transform the data for better readability
+    const exportData = result.rows.map(match => {
+      const mentorData = match.mentor_data;
+      const menteeData = match.mentee_data;
+      
+      return {
+        "Match ID": match.id,
+        "Mentor Name": `${mentorData.firstName} ${mentorData.lastName}`,
+        "Mentor Email": mentorData.email,
+        "Mentor Major": mentorData.major,
+        "Mentor Year": mentorData.year,
+        "Mentee Name": `${menteeData.firstName} ${menteeData.lastName}`,
+        "Mentee Email": menteeData.email, 
+        "Mentee Major": menteeData.major,
+        "Mentee Year": menteeData.year,
+        "Match Score": Number(match.match_score).toFixed(2),
+        "Approved Date": new Date(match.approved_at).toLocaleDateString(),
+        "Approved By": match.approved_by || "Admin"
+      };
+    });
+
+    // Create workbook and worksheet
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+
+    // Set column widths for better readability
+    const colWidths = [
+      { wch: 10 }, // Match ID
+      { wch: 20 }, // Mentor Name
+      { wch: 25 }, // Mentor Email
+      { wch: 25 }, // Mentor Major
+      { wch: 8 },  // Mentor Year
+      { wch: 20 }, // Mentee Name
+      { wch: 25 }, // Mentee Email
+      { wch: 25 }, // Mentee Major
+      { wch: 8 },  // Mentee Year
+      { wch: 12 }, // Match Score
+      { wch: 15 }, // Approved Date
+      { wch: 12 }  // Approved By
+    ];
+    worksheet['!cols'] = colWidths;
+
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Approved Matches");
+
+    // Generate XLSX buffer
+    const xlsxBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+    // Set headers for file download
+    const timestamp = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const filename = `NSBE_Approved_Matches_${timestamp}.xlsx`;
+    
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', xlsxBuffer.length);
+
+    debugLog(`✅ Exported ${result.rows.length} approved matches to ${filename}`);
+    res.send(xlsxBuffer);
+
+  } catch (err) {
+    console.error("Failed to export approved matches:", err);
+    res.status(500).json({ error: "Failed to export approved matches", details: err.message });
   }
 });
 

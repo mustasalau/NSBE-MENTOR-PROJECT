@@ -293,6 +293,88 @@ export default function Dashboard() {
     setSubmissionToDelete(null);
   };
 
+  // Export submissions to XLSX
+  const handleExportSubmissions = async () => {
+    try {
+      debugLog("📊 Downloading submissions XLSX...");
+      const response = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL || "https://nsbe-mentor-project.onrender.com"}/api/export/submissions`,
+        {
+          responseType: 'blob',
+          withCredentials: true,
+        }
+      );
+
+      // Create blob link to download file
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Get filename from response headers or create default
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = 'NSBE_Submissions.xlsx';
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+      
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      debugLog(`✅ Downloaded ${filename}`);
+    } catch (error) {
+      console.error("Error exporting submissions:", error);
+      const errorMessage = error.response?.data?.error || "Failed to export submissions";
+      alert(`Export failed: ${errorMessage}`);
+    }
+  };
+
+  // Export approved matches to XLSX
+  const handleExportApprovedMatches = async () => {
+    try {
+      debugLog("📊 Downloading approved matches XLSX...");
+      const response = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL || "https://nsbe-mentor-project.onrender.com"}/api/export/approved-matches`,
+        {
+          responseType: 'blob',
+          withCredentials: true,
+        }
+      );
+
+      // Create blob link to download file
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Get filename from response headers or create default
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = 'NSBE_Approved_Matches.xlsx';
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+      
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      debugLog(`✅ Downloaded ${filename}`);
+    } catch (error) {
+      console.error("Error exporting approved matches:", error);
+      const errorMessage = error.response?.data?.error || "Failed to export approved matches";
+      alert(`Export failed: ${errorMessage}`);
+    }
+  };
+
   const settingsConfig = [
     { key: "major", label: "Major", explanation: 'Bidirectional matching considers BOTH mentor and mentee major preferences. When either party wants a major match, weight increases. Penalties apply when preferences are not satisfied.' },
     { key: "gender", label: "Gender", explanation: 'Bidirectional matching considers BOTH mentor and mentee gender preferences. Maximum score when both preferences are satisfied, partial score for one-sided satisfaction, penalties for conflicts.' },
@@ -1095,6 +1177,22 @@ const mentees = data.filter((entry) => entry.role?.toLowerCase() === "mentee");
                 </tbody>
               </table>
             </div>
+            
+            {/* Export Button for Submissions */}
+            {filteredData.length > 0 && (
+              <div className="mt-4 text-center">
+                <button
+                  onClick={handleExportSubmissions}
+                  className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                  title="Export all submissions to Excel file"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Export to XLSX
+                </button>
+              </div>
+            )}
           </div>
         </>
       )}
@@ -1389,6 +1487,22 @@ const mentees = data.filter((entry) => entry.role?.toLowerCase() === "mentee");
             <div className="text-center text-gray-500 mt-8">
               <p className="text-lg">No approved matches yet.</p>
               <p className="text-sm">Approved matches will appear here after you review and approve them from the Matches tab.</p>
+            </div>
+          )}
+
+          {/* Export Button for Approved Matches */}
+          {approvedMatches.length > 0 && (
+            <div className="mt-6 text-center">
+              <button
+                onClick={handleExportApprovedMatches}
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                title="Export approved matches to Excel file"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Export Matches to XLSX
+              </button>
             </div>
           )}
                  </div>
