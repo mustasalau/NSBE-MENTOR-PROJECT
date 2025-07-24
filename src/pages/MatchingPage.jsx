@@ -90,7 +90,7 @@ export default function MatchingPage({ onLogin }) {
             setPassword(e.target.value);
             if (error) setError("");
           }}
-          className="w-64 p-3 rounded bg-gray-900 text-white placeholder-gray-400 border border-gray-700 shadow-2xl focus:outline-none focus:ring-2 focus:ring-gray-500"
+          className="w-56 sm:w-64 p-2 sm:p-3 rounded bg-gray-900 text-white placeholder-gray-400 border border-gray-700 shadow-2xl focus:outline-none focus:ring-2 focus:ring-gray-500 text-sm sm:text-base"
         />
 
         {error && <p className="text-red-500 text-center text-sm">{error}</p>}
@@ -98,7 +98,7 @@ export default function MatchingPage({ onLogin }) {
         <button
           type="submit"
           disabled={loading}
-          className="bg-gray-700 hover:bg-gray-600 text-white font-medium px-6 py-2 rounded shadow-2xl transition mx-auto"
+          className="bg-gray-700 hover:bg-gray-600 text-white font-medium px-4 sm:px-6 py-2 sm:py-3 rounded shadow-2xl transition mx-auto text-sm sm:text-base"
         >
           {loading ? (
             <span className="flex items-center space-x-1">

@@ -3,6 +3,13 @@ const { Pool } = pg;
 
 import dotenv from 'dotenv';
 dotenv.config();
+
+// Debug utility - only logs in development
+const debugLog = (...args) => {
+  if (process.env.NODE_ENV !== 'production' || process.env.DEBUG === 'true') {
+    console.log(...args);
+  }
+};
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL, // or your NeonSQL connection string
 });
@@ -31,7 +38,7 @@ async function migrateMusicalArtists() {
       [JSON.stringify(parsed), row.id]
     );
   }
-  console.log('Migration complete!');
+  debugLog('Migration complete!');
   await pool.end();
 }
 

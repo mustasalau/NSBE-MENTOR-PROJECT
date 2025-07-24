@@ -4,6 +4,13 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { vectorizeAndSave, loadVectors } from "./openAIhelpers.js";
 
+// Debug utility - only logs in development
+const debugLog = (...args) => {
+  if (process.env.NODE_ENV !== 'production' || process.env.DEBUG === 'true') {
+    console.log(...args);
+  }
+};
+
 const router = express.Router();
 
 // __dirname workaround in ESM
@@ -48,7 +55,7 @@ router.post("/add", async (req, res) => {
     staticTraits.push(titleCaseTrait);
     staticTraits.sort();
     fs.writeFileSync(traitsPath, JSON.stringify(staticTraits, null, 2));
-    console.log(`✅ Added new trait to traits.json: "${titleCaseTrait}"`);
+    debugLog(`✅ Added new trait to traits.json: "${titleCaseTrait}"`);
   }
 
   res.json({

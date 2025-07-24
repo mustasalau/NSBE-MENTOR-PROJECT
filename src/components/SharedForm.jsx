@@ -27,6 +27,7 @@ export default function SharedForm({ role, onSubmit }) {
   idealMatchDescription: "",
   menteeInMajor: "",
   openToMultiple: "",
+  preferredStudentId: "",
 });
 
 
@@ -54,7 +55,7 @@ export default function SharedForm({ role, onSubmit }) {
   const [traitClickInProgress, setTraitClickInProgress] = useState(false);
   const [clubsLoading, setClubsLoading] = useState(false);
   const [hobbyVectors, setHobbyVectors] = useState({});
-  const progressPercent = Math.round((step / 8) * 100);
+  const progressPercent = Math.round(((step - 1) / 8) * 100);
   const [showConfetti, setShowConfetti] = useState(false);
   const [showTitle, setShowTitle] = useState(false);
   const [showMessage, setShowMessage] = useState(false);
@@ -105,6 +106,7 @@ export default function SharedForm({ role, onSubmit }) {
     5: ["organizations"],
     6: ["expectations"],
     7: ["personalityWords", "idealMatchDescription"],
+    8: [], // No required fields for step 8 (preferred student ID is optional)
   };
 
   const validateStep = (stepToValidate) => {
@@ -177,6 +179,11 @@ export default function SharedForm({ role, onSubmit }) {
       if (!missing.includes("idealMatchDescription")) missing.push("idealMatchDescription");
     }
 
+    // Validate preferred student ID format on step 8 (optional field)
+    if (stepToValidate === 8 && formData.preferredStudentId && !/^\d{9}$/.test(formData.preferredStudentId)) {
+      if (!missing.includes("preferredStudentId")) missing.push("preferredStudentId");
+    }
+
     setErrors(missing);
     if (missing.length > 0) {
       nextBtnRef.current?.classList.add("animate-shake");
@@ -207,7 +214,7 @@ export default function SharedForm({ role, onSubmit }) {
           new Fuse(Object.keys(res.data), {
             includeScore: true,
             threshold: 0.3,
-            minMatchCharLength: 3,
+            minMatchCharLength: 2,
             shouldSort: true,
           }),
         );
@@ -268,7 +275,7 @@ export default function SharedForm({ role, onSubmit }) {
   };
 
   useEffect(() => {
-    if (step === 8) {
+    if (step === 9) {
       setShowTitle(false);
       setShowMessage(false);
 
@@ -523,6 +530,7 @@ export default function SharedForm({ role, onSubmit }) {
           idealMatchDescription: formData.idealMatchDescription,
           menteeInMajor: formData.menteeInMajor,
           openToMultiple: formData.openToMultiple,
+          preferredStudentId: formData.preferredStudentId,
         }),
       });
 
@@ -570,7 +578,7 @@ export default function SharedForm({ role, onSubmit }) {
       setShowConfetti(true);
       setTimeout(() => {
         setIsSubmitting(false);
-        setStep(8);
+        setStep(9);
       }, 1000); // Small delay to show the success before transitioning
 
     } catch (err) {
@@ -732,7 +740,7 @@ export default function SharedForm({ role, onSubmit }) {
     updated[index].raw = value;
     setFormData({ ...formData, personalityWords: updated });
 
-    if (value.trim().length >= 3 && traitFuse) {  
+    if (value.trim().length >= 2 && traitFuse) {  
     const results = traitFuse.search(value).map((r) => r.item);
     setTraitSuggestions(results);
     setActiveTraitIndex(index);
@@ -784,11 +792,11 @@ export default function SharedForm({ role, onSubmit }) {
       {isSubmitting && <NSBELoadingOverlay />}
       <form
         onSubmit={handleSubmit}
-        className={`space-y-4 mx-auto ${step < 8 ? "bg-white p-6 rounded shadow-lg max-w-lg" : ""}`}
+        className={`space-y-4 mx-auto ${step < 9 ? "bg-white p-4 sm:p-6 rounded shadow-lg max-w-lg" : ""}`}
       >
         {" "}
         {errors.length > 0 && (
-        <div className="absolute right-6 top-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-md w-80">
+        <div className="fixed sm:absolute right-2 sm:right-6 top-2 sm:top-6 bg-red-100 border border-red-400 text-red-700 px-3 sm:px-4 py-2 sm:py-3 rounded-lg shadow-md w-72 sm:w-80 z-50">
           <strong className="font-bold">Please complete:</strong>
           <ul className="mt-2 list-disc list-inside text-sm">
             {errors.map((field) => (
@@ -800,16 +808,16 @@ export default function SharedForm({ role, onSubmit }) {
         </div>
       )}
       {/* Header */}
-      {step <= 7 && (
-        <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">
+      {step <= 8 && (
+        <h2 className="text-xl sm:text-2xl font-bold text-center text-gray-800 mb-2">
           {role === "mentor"
-            ? `Mentor Sign-Up (Step ${step} of 7)`
-            : `Mentee Sign-Up (Step ${step} of 7)`}
+            ? `Mentor Sign-Up (Step ${step} of 8)`
+            : `Mentee Sign-Up (Step ${step} of 8)`}
         </h2>
       )}
       {/* Progress Bar */}
-      {step < 8 && (
-        <div className="w-full max-w-md mx-auto mb-6 px-4">
+      {step < 9 && (
+        <div className="w-full max-w-md mx-auto mb-4 sm:mb-6 px-2 sm:px-4">
           <div className="flex items-center justify-between mb-1">
             <span className="text-sm text-gray-500">Progress</span>
             <span className="text-sm text-gray-600 font-medium">
@@ -832,14 +840,14 @@ export default function SharedForm({ role, onSubmit }) {
               value={formData.firstName}
               onChange={handleChange}
               placeholder="First Name"
-              className={`w-full border px-4 py-2 rounded ${errors.includes("firstName") ? "border-red-500" : ""}`}
+              className={`w-full border px-3 sm:px-4 py-2 sm:py-3 rounded text-sm sm:text-base ${errors.includes("firstName") ? "border-red-500" : ""}`}
             />
             <input
               name="lastName"
               value={formData.lastName}
               onChange={handleChange}
               placeholder="Last Name"
-              className={`w-full border px-4 py-2 rounded ${errors.includes("lastName") ? "border-red-500" : ""}`}
+              className={`w-full border px-3 sm:px-4 py-2 sm:py-3 rounded text-sm sm:text-base ${errors.includes("lastName") ? "border-red-500" : ""}`}
             />
           </div>
 
@@ -849,7 +857,7 @@ export default function SharedForm({ role, onSubmit }) {
             onChange={handleChange}
             type="email"
             placeholder="PSU Email"
-            className={`w-full border px-4 py-2 rounded ${errors.includes("email") ? "border-red-500" : ""}`}
+            className={`w-full border px-3 sm:px-4 py-2 sm:py-3 rounded text-sm sm:text-base ${errors.includes("email") ? "border-red-500" : ""}`}
           />
 
           <input
@@ -858,7 +866,7 @@ export default function SharedForm({ role, onSubmit }) {
             onChange={handleChange}
             type="email"
             placeholder="Personal Email"
-            className="w-full border px-4 py-2 rounded"
+            className="w-full border px-3 sm:px-4 py-2 sm:py-3 rounded text-sm sm:text-base"
           />
 
           <input
@@ -867,7 +875,7 @@ export default function SharedForm({ role, onSubmit }) {
             onChange={handleChange}
             type="number"
             placeholder="9-Digit Student ID"
-            className={`w-full border px-4 py-2 rounded ${errors.includes("studentId") ? "border-red-500" : ""}`}
+            className={`w-full border px-3 sm:px-4 py-2 sm:py-3 rounded text-sm sm:text-base ${errors.includes("studentId") ? "border-red-500" : ""}`}
           />
 
           <div className="relative">
@@ -877,7 +885,7 @@ export default function SharedForm({ role, onSubmit }) {
               onChange={handleChange}
               placeholder="Major"
               autoComplete="off"
-              className={`w-full border px-4 py-2 rounded ${errors.includes("major") ? "border-red-500" : ""}`}
+              className={`w-full border px-3 sm:px-4 py-2 sm:py-3 rounded text-sm sm:text-base ${errors.includes("major") ? "border-red-500" : ""}`}
               onKeyDown={(e) => {
                 const list = filteredMajors || [];
                 let newFocus = focusedMajorIndex;
@@ -921,7 +929,7 @@ export default function SharedForm({ role, onSubmit }) {
               name="gender"
               value={formData.gender}
               onChange={handleChange}
-              className={`w-full border px-4 py-2 rounded ${errors.includes("gender") ? "border-red-500" : ""}`}
+              className={`w-full border px-3 sm:px-4 py-2 sm:py-3 rounded text-sm sm:text-base ${errors.includes("gender") ? "border-red-500" : ""}`}
             >
               <option value="">Select Gender</option>
               <option>Male</option>
@@ -933,7 +941,7 @@ export default function SharedForm({ role, onSubmit }) {
               name="year"
               value={formData.year}
               onChange={handleChange}
-              className={`w-full border px-4 py-2 rounded ${errors.includes("year") ? "border-red-500" : ""}`}
+              className={`w-full border px-3 sm:px-4 py-2 sm:py-3 rounded text-sm sm:text-base ${errors.includes("year") ? "border-red-500" : ""}`}
             >
               <option value="">Select Year</option>
               <option>1st</option>
@@ -947,7 +955,7 @@ export default function SharedForm({ role, onSubmit }) {
             name="pairGenderPreference"
             value={formData.pairGenderPreference}
             onChange={handleChange}
-            className={`w-full border px-4 py-2 rounded ${errors.includes("pairGenderPreference") ? "border-red-500" : ""}`}
+            className={`w-full border px-3 sm:px-4 py-2 sm:py-3 rounded text-sm sm:text-base ${errors.includes("pairGenderPreference") ? "border-red-500" : ""}`}
           >
             <option value="">
               {role === "mentor"
@@ -1262,7 +1270,7 @@ export default function SharedForm({ role, onSubmit }) {
               name="meetingFrequency"
               value={formData.meetingFrequency}
               onChange={handleChange}
-              className={`w-full border px-4 py-2 rounded ${errors.includes("meetingFrequency") ? "border-red-500" : ""}`}
+              className={`w-full border px-3 sm:px-4 py-2 sm:py-3 rounded text-sm sm:text-base ${errors.includes("meetingFrequency") ? "border-red-500" : ""}`}
             >
               <option value="">Preferred Meeting Frequency</option>
               <option>Weekly</option>
@@ -1280,7 +1288,7 @@ export default function SharedForm({ role, onSubmit }) {
                 name="openToMultiple"
                 value={formData.openToMultiple}
                 onChange={handleChange}
-                className={`w-full border px-4 py-2 rounded ${errors.includes("openToMultiple") ? "border-red-500" : ""}`}
+                className={`w-full border px-3 sm:px-4 py-2 sm:py-3 rounded text-sm sm:text-base ${errors.includes("openToMultiple") ? "border-red-500" : ""}`}
               >
                 <option value="">Select One</option>
                 <option>Yes</option>
@@ -1299,7 +1307,7 @@ export default function SharedForm({ role, onSubmit }) {
               name="menteeInMajor"
               value={formData.menteeInMajor}
               onChange={handleChange}
-              className={`w-full border px-4 py-2 rounded ${errors.includes("menteeInMajor") ? "border-red-500" : ""}`}
+              className={`w-full border px-3 sm:px-4 py-2 sm:py-3 rounded text-sm sm:text-base ${errors.includes("menteeInMajor") ? "border-red-500" : ""}`}
             >
               <option value="">Select One</option>
               <option>Yes</option>
@@ -1322,7 +1330,7 @@ export default function SharedForm({ role, onSubmit }) {
                     onChange={(e) =>
                       handleOrgInputChange(index, e.target.value)
                     }
-                    placeholder="e.g., NSBE, Club Basketball"
+                    placeholder="NSBE, Men's Club Soccer, etc."
                     className={`w-full border px-4 py-2 rounded pr-10 ${errors.includes("organizations") &&
                         (!org || org.trim() === "")
                         ? "border-red-500"
@@ -1424,7 +1432,7 @@ export default function SharedForm({ role, onSubmit }) {
                   ? "What do you expect from your mentee?"
                   : "What do you expect from your mentor?"
               }
-              className={`w-full border px-4 py-2 rounded pr-20 ${errors.includes("expectations") ? "border-red-500" : ""}`}
+              className={`w-full border px-3 sm:px-4 py-2 sm:py-3 rounded pr-16 sm:pr-20 text-sm sm:text-base ${errors.includes("expectations") ? "border-red-500" : ""}`}
               rows="3"
               maxLength="250"
             />
@@ -1463,7 +1471,7 @@ export default function SharedForm({ role, onSubmit }) {
                       }`}
                     onFocus={() => {
   const value = traitObj?.raw?.trim() || "";
-  if (value && traitFuse?.search) {
+  if (value && value.length >= 2 && traitFuse?.search) {
     const results = traitFuse.search(value).map((r) => r.item);
     setTraitSuggestions(results);
     setActiveTraitIndex(index);
@@ -1584,6 +1592,7 @@ export default function SharedForm({ role, onSubmit }) {
             )}
           </div>
 
+          <div className="pt-4 border-t border-gray-200">
           <p className="font-medium text-base text-violet-500 text-center">
             {role === "mentor"
               ? `Describe your ideal mentee in a few words.`
@@ -1595,7 +1604,7 @@ export default function SharedForm({ role, onSubmit }) {
               value={formData.idealMatchDescription}
               onChange={handleChange}
               placeholder="My twin 🤪"
-              className={`w-full border px-4 py-2 rounded mt-4 pr-20 ${errors.includes("idealMatchDescription") ? "border-red-500" : ""
+              className={`w-full border px-3 sm:px-4 py-2 sm:py-3 rounded mt-4 pr-16 sm:pr-20 text-sm sm:text-base ${errors.includes("idealMatchDescription") ? "border-red-500" : ""
                 }`}
               rows="3"
               maxLength="250"
@@ -1608,9 +1617,53 @@ export default function SharedForm({ role, onSubmit }) {
               {formData.idealMatchDescription.length}/250
             </div>
           </div>
+          </div>
+
+
         </div>
       )}
+      
       {step === 8 && (
+        <div className="space-y-4">
+          <h3 className="text-xl font-semibold text-gray-800">One last thing...</h3>
+          <p className="font-medium text-base text-violet-500 text-center">
+            {role === "mentor"
+              ? "Do you have a specific mentee in mind? (Optional)"
+              : "Do you have a specific mentor in mind? (Optional)"}
+          </p>
+          
+          <div className="space-y-4">
+            <div className="max-w-md mx-auto">
+              <input
+                name="preferredStudentId"
+                value={formData.preferredStudentId}
+                onChange={handleChange}
+                placeholder="Enter their 9 digit PSU ID"
+                className={`w-full border px-3 sm:px-4 py-2 sm:py-3 rounded text-center text-sm sm:text-base ${
+                  errors.includes("preferredStudentId") ? "border-red-500" : ""
+                }`}
+                maxLength="9"
+              />
+              {errors.includes("preferredStudentId") && (
+                <p className="text-red-500 text-sm text-center mt-2">
+                  Please enter exactly 9 digits
+                </p>
+              )}
+            </div>
+            
+            <div className="text-center space-y-2">
+              <p className="text-gray-500 text-sm">
+                If they haven't signed up yet, we'll do our best to match you when they do!
+              </p>
+              <p className="text-gray-600 text-sm">
+                Leave blank if you don't have anyone specific in mind.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {step === 9 && (
         <div className="absolute inset-0 flex flex-col justify-center items-center text-center space-y-6 px-4 z-50">
           {showConfetti && (
             <Confetti
@@ -1643,32 +1696,32 @@ export default function SharedForm({ role, onSubmit }) {
           </Link>
         </div>
       )}
-      <div className="flex justify-between pt-4">
-        {step > 1 && step < 8 && (
+      <div className="flex justify-between pt-3 sm:pt-4">
+        {step > 1 && step < 9 && (
           <button
             type="button"
             onClick={handleBack}
-            className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400"
+            className="bg-gray-300 px-3 sm:px-4 py-2 sm:py-3 rounded hover:bg-gray-400 text-sm sm:text-base"
           >
             Back
           </button>
         )}
 
-        {step < 7 ? (
+        {step < 8 ? (
           <button
             ref={nextBtnRef}
             type="button"
             onClick={handleNext}
-            className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800"
+            className="bg-black text-white px-3 sm:px-4 py-2 sm:py-3 rounded hover:bg-gray-800 text-sm sm:text-base"
           >
             Next
           </button>
-        ) : step === 7 ? (
+        ) : step === 8 ? (
           <button
             type="button"
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className={`px-4 py-2 rounded text-white ${
+            className={`px-3 sm:px-4 py-2 sm:py-3 rounded text-white text-sm sm:text-base ${
               isSubmitting 
                 ? 'bg-gray-400 cursor-not-allowed' 
                 : 'bg-green-600 hover:bg-green-700'

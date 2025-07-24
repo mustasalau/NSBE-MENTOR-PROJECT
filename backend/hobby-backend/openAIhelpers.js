@@ -5,6 +5,13 @@ import OpenAI from "openai";
 
 dotenv.config();
 
+// Debug utility - only logs in development
+const debugLog = (...args) => {
+  if (process.env.NODE_ENV !== 'production' || process.env.DEBUG === 'true') {
+    console.log(...args);
+  }
+};
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
@@ -33,7 +40,7 @@ export function loadVectors(filePath) {
 
 export async function vectorizeAndSave(term, filePath, vectors, promptPrefix = "") {
   if (vectors[term]) {
-    console.log(`"${term}" already vectorized.`);
+    debugLog(`"${term}" already vectorized.`);
     return vectors[term];
   }
 
@@ -42,7 +49,7 @@ export async function vectorizeAndSave(term, filePath, vectors, promptPrefix = "
   if (embedding) {
     vectors[term] = embedding;
     fs.writeFileSync(filePath, JSON.stringify(vectors, null, 2));
-    console.log(`Vector file updated with: "${term}"`);
+          debugLog(`Vector file updated with: "${term}"`);
   }
 
   return embedding;

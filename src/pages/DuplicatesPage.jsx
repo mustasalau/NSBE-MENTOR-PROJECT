@@ -2,11 +2,12 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
-export default function DuplicatesPage() {
+export default function DuplicatesPage({ reloadData }) {
   const [duplicates, setDuplicates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(null);
   const navigate = useNavigate();
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || "https://nsbe-mentor-project.onrender.com";
 
   useEffect(() => {
     fetchDuplicates();
@@ -14,7 +15,7 @@ export default function DuplicatesPage() {
 
   const fetchDuplicates = async () => {
     try {
-      const response = await axios.get("https://nsbe-mentor-project.onrender.com/api/duplicates");
+      const response = await axios.get(`${backendUrl}/api/duplicates`);
       setDuplicates(response.data.duplicates || []);
     } catch (error) {
       console.error("Error fetching duplicates:", error);
@@ -30,20 +31,19 @@ export default function DuplicatesPage() {
 
     setDeleting(submissionId);
     try {
-      await axios.delete(`https://nsbe-mentor-project.onrender.com/api/submission/${submissionId}`);
-      
+      await axios.delete(`${backendUrl}/api/submission/${submissionId}`);
       // Update the duplicates state by removing the deleted submission
       setDuplicates(prevDuplicates => {
         const newDuplicates = [...prevDuplicates];
         newDuplicates[groupIndex].submissions.splice(submissionIndex, 1);
-        
         // If only one submission remains, remove the entire group
         if (newDuplicates[groupIndex].submissions.length <= 1) {
           newDuplicates.splice(groupIndex, 1);
         }
-        
         return newDuplicates;
       });
+      // Call reloadData to update unmatched counts in Dashboard
+      if (reloadData) reloadData();
     } catch (error) {
       console.error("Error deleting submission:", error);
       alert("Failed to delete submission. Please try again.");
@@ -118,7 +118,7 @@ export default function DuplicatesPage() {
               </svg>
             </div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">No Duplicates Found</h3>
-            <p className="text-gray-600">All submissions appear to be unique based on student ID and name matching.</p>
+            <p className="text-gray-600">All submissions appear to be unique based on PSU ID and name matching.</p>
           </div>
         )}
 

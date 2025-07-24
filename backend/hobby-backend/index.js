@@ -7,6 +7,13 @@ import dotenv from "dotenv";
 import pg from "pg";
 import cookieParser from "cookie-parser";
 
+// Debug utility - only logs in development
+const debugLog = (...args) => {
+  if (process.env.NODE_ENV !== 'production' || process.env.DEBUG === 'true') {
+    console.log(...args);
+  }
+};
+
 import { vectorizeAndSave, loadVectors, vectorizeText, arrayToVectorString } from "./openAIhelpers.js";import traitRoutes from "./traitRoutes.js";
 import spotifyRoutes from "./spotifyRoutes.js";
 
@@ -16,6 +23,42 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 });
+
+// Database migration: Add preferred_student_id column if it doesn't exist
+(async () => {
+  try {
+    await pool.query(`
+      ALTER TABLE mentor_mentee_submissions 
+      ADD COLUMN IF NOT EXISTS preferred_student_id VARCHAR(9);
+    `);
+    debugLog("✅ Database migration completed: preferred_student_id column added");
+  } catch (err) {
+    console.error("Database migration error:", err);
+  }
+})();
+
+// Database migration: Create approved_matches table
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS approved_matches (
+        id SERIAL PRIMARY KEY,
+        mentor_id INTEGER NOT NULL,
+        mentee_id INTEGER NOT NULL,
+        mentor_data JSONB NOT NULL,
+        mentee_data JSONB NOT NULL,
+        match_score DECIMAL(10,6) NOT NULL,
+        match_details JSONB NOT NULL,
+        approved_at TIMESTAMP DEFAULT NOW(),
+        approved_by VARCHAR(255),
+        UNIQUE(mentor_id, mentee_id)
+      );
+    `);
+    debugLog("✅ Database migration completed: approved_matches table created");
+  } catch (err) {
+    console.error("Approved matches table migration error:", err);
+  }
+})();
 
 const app = express();
 const PORT = process.env.PORT || 5009;
@@ -58,7 +101,7 @@ app.use((req, res, next) => {
 app.use(cors({
   origin: [
     'https://nsbe-mentor-project.vercel.app',  // Production
-    'http://localhost:5174',                   // Local development
+    'http://localhost:5175',                   // Local development
     'http://localhost:3000',                   // Common React dev port
     'http://localhost:5173'                    // Another common Vite port
   ],
@@ -158,7 +201,7 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 app.post("/api/login", (req, res) => {
   const { password } = req.body;
 
-  console.log("Login attempt with password:", password);
+  debugLog("Login attempt with password:", password);
 
   if (password === ADMIN_PASSWORD) {
     res.cookie("loggedIn", "true", {
@@ -209,13 +252,13 @@ app.post("/api/hobbies/normalize", strictRateLimit, async (req, res) => {
     }
 
     if (!hobbyVectors[normalized]) {
-      console.log(`Vectorizing new hobby: "${normalized}"`);
+              debugLog(`Vectorizing new hobby: "${normalized}"`);
       const vec = await vectorizeAndSave(normalized, hobbyVectorPath, hobbyVectors, "This is a hobby or leisure activity someone might enjoy: ");
       if (vec) {
         hobbyVectors[normalized] = vec;
         hobbies.push(normalized);
         updated = true;
-        console.log(`Added "${normalized}" to hobby list and vector set.`);
+                  debugLog(`Added "${normalized}" to hobby list and vector set.`);
       } else {
         console.warn(`Failed to vectorize: "${normalized}"`);
         continue;
@@ -227,7 +270,7 @@ app.post("/api/hobbies/normalize", strictRateLimit, async (req, res) => {
   if (updated) {
     fs.writeFileSync(hobbyVectorPath, JSON.stringify(hobbyVectors, null, 2));
     fs.writeFileSync(path.join(__dirname, "..", "..", "src", "data", "hobbies.json"), JSON.stringify(hobbies, null, 2));
-    console.log("Hobby list and vector file updated.");
+    debugLog("Hobby list and vector file updated.");
   }
 
   res.json({ normalized: results });
@@ -248,7 +291,7 @@ app.post("/api/test-text-vectorization", strictRateLimit, async (req, res) => {
       });
     }
 
-    console.log(`Testing vectorization for ${role} ${textType}: "${text}"`);
+    debugLog(`Testing vectorization for ${role} ${textType}: "${text}"`);
     const vector = await vectorizeText(text, textType, role);
     
     if (vector) {
@@ -282,13 +325,16 @@ app.get("/api/submissions", async (req, res) => {
 
 app.post("/api/submit", strictRateLimit, async (req, res) => {
   const data = req.body;
+  
+  // console.log(`🐛 Debug - Full request body:`, JSON.stringify(data, null, 2));
 
   try {
     const {
       role, firstName, lastName, email, personalEmail, studentId,
       major, gender, year, pairGenderPreference, meetingFrequency,
       hobbies, musicalArtists, organizations, personalityWords,
-      expectations, idealMatchDescription, menteeInMajor, openToMultiple
+      expectations, idealMatchDescription, menteeInMajor, openToMultiple,
+      preferredStudentId
     } = data;
 
     // Validate character limits for expectations and ideal match description
@@ -315,12 +361,12 @@ app.post("/api/submit", strictRateLimit, async (req, res) => {
     let idealMatchVector = null;
 
     if (expectations && expectations.trim()) {
-      console.log(`Vectorizing expectations for ${role}: "${expectations}"`);
+      debugLog(`Vectorizing expectations for ${role}: "${expectations}"`);
       expectationsVector = await vectorizeText(expectations, "expectations", role);
     }
 
     if (idealMatchDescription && idealMatchDescription.trim()) {
-      console.log(`Vectorizing ideal match description for ${role}: "${idealMatchDescription}"`);
+      debugLog(`Vectorizing ideal match description for ${role}: "${idealMatchDescription}"`);
       idealMatchVector = await vectorizeText(idealMatchDescription, "idealMatch", role);
     }
 
@@ -329,7 +375,7 @@ app.post("/api/submit", strictRateLimit, async (req, res) => {
     // Vectorize hobbies using CACHED vectors
     let hobbyVectorArrays = [];
     if (hobbies && hobbies.length > 0) {
-      console.log(`Getting cached vectors for hobbies:`, hobbies);
+      debugLog(`Getting cached vectors for hobbies:`, hobbies);
       
       for (const hobby of hobbies) {
         if (hobby && hobby.trim()) {
@@ -339,7 +385,7 @@ app.post("/api/submit", strictRateLimit, async (req, res) => {
           
           let embeddingArray = hobbyVectors[hobbyKey];
           if (!embeddingArray) {
-            console.log(`Vectorizing new hobby: "${hobbyKey}"`);
+            debugLog(`Vectorizing new hobby: "${hobbyKey}"`);
             embeddingArray = await vectorizeAndSave(hobbyKey, hobbyVectorPath, hobbyVectors, "This is a hobby or leisure activity someone might enjoy: ");
           }
           
@@ -352,8 +398,12 @@ app.post("/api/submit", strictRateLimit, async (req, res) => {
 
     // Vectorize traits using CACHED vectors  
     let traitVectorArrays = [];
+    // console.log(`🐛 Debug - personalityWords received:`, personalityWords);
+    // console.log(`🐛 Debug - personalityWords type:`, typeof personalityWords);
+    // console.log(`🐛 Debug - personalityWords isArray:`, Array.isArray(personalityWords));
+    
     if (personalityWords && personalityWords.length > 0) {
-      console.log(`Getting cached vectors for traits:`, personalityWords.map(p => p.raw));
+      debugLog(`Getting cached vectors for traits:`, personalityWords.map(p => p.raw));
       
       for (const trait of personalityWords) {
         if (trait.raw && trait.raw.trim()) {
@@ -361,7 +411,7 @@ app.post("/api/submit", strictRateLimit, async (req, res) => {
           
           let embeddingArray = traitVectors[traitKey];
           if (!embeddingArray) {
-            console.log(`Vectorizing new trait: "${traitKey}"`);
+            debugLog(`Vectorizing new trait: "${traitKey}"`);
             embeddingArray = await vectorizeAndSave(traitKey, traitVectorPath, traitVectors, "This is a personal trait or characteristic: ");
           }
           
@@ -379,14 +429,14 @@ app.post("/api/submit", strictRateLimit, async (req, res) => {
         major, gender, year, pair_gender_preference, meeting_frequency,
         hobbies, organizations, personality_words,
         expectations, ideal_match_description, mentee_in_major, open_to_multiple,
-        musical_artists_json, 
+        musical_artists_json, preferred_student_id,
         expectations_vector, ideal_match_vector,
         hobby_vectors, trait_vectors
       ) VALUES (
         $1, $2, $3, $4, $5, $6,
         $7, $8, $9, $10, $11,
         $12, $13, $14, $15,
-        $16, $17, $18, $19, $20, $21, $22, $23
+        $16, $17, $18, $19, $20, $21, $22, $23, $24
       )`,
       [
         role, firstName, lastName, email, personalEmail, studentId,
@@ -399,6 +449,7 @@ app.post("/api/submit", strictRateLimit, async (req, res) => {
         menteeInMajor,
         openToMultiple,
         JSON.stringify(musicalArtists),
+        preferredStudentId || null,
         expectationsVector ? JSON.stringify(expectationsVector) : null,
         idealMatchVector ? JSON.stringify(idealMatchVector) : null,
         hobbyVectorArrays.length > 0 ? JSON.stringify(hobbyVectorArrays) : null, // ✅ Simple JSON
@@ -608,6 +659,11 @@ function parseMusicalArtists(musicalArtistsJson) {
 
 // Extract artist name from displayName (handles both "Artist" and "Song by Artist" formats)
 function extractArtistName(displayName) {
+  // Handle undefined or null displayName
+  if (!displayName || typeof displayName !== 'string') {
+    return '';
+  }
+  
   // Check if it contains " by " (song/album format)
   const byIndex = displayName.lastIndexOf(' by ');
   if (byIndex !== -1) {
@@ -621,12 +677,23 @@ function extractArtistName(displayName) {
 function calculateArtistOverlap(mentorArtists, menteeArtists) {
   if (!mentorArtists.length || !menteeArtists.length) return 0;
   
+  // Filter out artists with invalid displayName before processing
+  const validMentorArtists = mentorArtists.filter(a => a && a.displayName);
+  const validMenteeArtists = menteeArtists.filter(a => a && a.displayName);
+  
+  if (!validMentorArtists.length || !validMenteeArtists.length) return 0;
+  
   // Extract actual artist names from displayNames
-  const mentorNames = new Set(mentorArtists.map(a => extractArtistName(a.displayName).toLowerCase()));
-  const menteeNames = new Set(menteeArtists.map(a => extractArtistName(a.displayName).toLowerCase()));
+  const mentorNames = new Set(validMentorArtists.map(a => extractArtistName(a.displayName).toLowerCase()).filter(name => name));
+  const menteeNames = new Set(validMenteeArtists.map(a => extractArtistName(a.displayName).toLowerCase()).filter(name => name));
   
   const overlap = [...mentorNames].filter(name => menteeNames.has(name)).length;
   const union = new Set([...mentorNames, ...menteeNames]).size;
+  
+  debugLog(`    🎤 Artist Overlap Debug:`);
+  debugLog(`      Mentor Names: [${Array.from(mentorNames).join(', ')}]`);
+  debugLog(`      Mentee Names: [${Array.from(menteeNames).join(', ')}]`);
+  debugLog(`      Overlap: ${overlap}, Union: ${union}, Jaccard: ${union > 0 ? (overlap / union).toFixed(4) : 0}`);
   
   return union > 0 ? overlap / union : 0; // Jaccard similarity
 }
@@ -634,16 +701,30 @@ function calculateArtistOverlap(mentorArtists, menteeArtists) {
 function calculateGenreSimilarity(mentorArtists, menteeArtists) {
   if (!mentorArtists.length || !menteeArtists.length) return 0;
   
+  // Filter out artists with invalid genres before processing
+  const validMentorArtists = mentorArtists.filter(a => a && Array.isArray(a.genres));
+  const validMenteeArtists = menteeArtists.filter(a => a && Array.isArray(a.genres));
+  
+  if (!validMentorArtists.length || !validMenteeArtists.length) return 0;
+  
   // Extract all genres from artists
   const mentorGenres = new Set();
   const menteeGenres = new Set();
   
-  mentorArtists.forEach(artist => {
-    artist.genres.forEach(genre => mentorGenres.add(genre.toLowerCase()));
+  validMentorArtists.forEach(artist => {
+    artist.genres.forEach(genre => {
+      if (genre && typeof genre === 'string') {
+        mentorGenres.add(genre.toLowerCase());
+      }
+    });
   });
   
-  menteeArtists.forEach(artist => {
-    artist.genres.forEach(genre => menteeGenres.add(genre.toLowerCase()));
+  validMenteeArtists.forEach(artist => {
+    artist.genres.forEach(genre => {
+      if (genre && typeof genre === 'string') {
+        menteeGenres.add(genre.toLowerCase());
+      }
+    });
   });
   
   if (!mentorGenres.size || !menteeGenres.size) return 0;
@@ -651,32 +732,61 @@ function calculateGenreSimilarity(mentorArtists, menteeArtists) {
   const overlap = [...mentorGenres].filter(genre => menteeGenres.has(genre)).length;
   const union = new Set([...mentorGenres, ...menteeGenres]).size;
   
+  debugLog(`    🎼 Genre Similarity Debug:`);
+  debugLog(`      Mentor Genres: [${Array.from(mentorGenres).join(', ')}]`);
+  debugLog(`      Mentee Genres: [${Array.from(menteeGenres).join(', ')}]`);
+  debugLog(`      Overlap: ${overlap}, Union: ${union}, Jaccard: ${union > 0 ? (overlap / union).toFixed(4) : 0}`);
+  
   return union > 0 ? overlap / union : 0; // Jaccard similarity
 }
 
 function calculateMusicalDiversity(mentorArtists, menteeArtists) {
   if (!mentorArtists.length || !menteeArtists.length) return 0;
   
+  // Filter out artists with invalid genres before processing
+  const validMentorArtists = mentorArtists.filter(a => a && Array.isArray(a.genres));
+  const validMenteeArtists = menteeArtists.filter(a => a && Array.isArray(a.genres));
+  
+  if (!validMentorArtists.length || !validMenteeArtists.length) return 0;
+  
   // Calculate genre diversity for each person
   const mentorGenres = new Set();
   const menteeGenres = new Set();
   
-  mentorArtists.forEach(artist => {
-    artist.genres.forEach(genre => mentorGenres.add(genre.toLowerCase()));
+  validMentorArtists.forEach(artist => {
+    artist.genres.forEach(genre => {
+      if (genre && typeof genre === 'string') {
+        mentorGenres.add(genre.toLowerCase());
+      }
+    });
   });
   
-  menteeArtists.forEach(artist => {
-    artist.genres.forEach(genre => menteeGenres.add(genre.toLowerCase()));
+  validMenteeArtists.forEach(artist => {
+    artist.genres.forEach(genre => {
+      if (genre && typeof genre === 'string') {
+        menteeGenres.add(genre.toLowerCase());
+      }
+    });
   });
   
-  const mentorDiversity = mentorGenres.size / Math.max(mentorArtists.length, 1);
-  const menteeDiversity = menteeGenres.size / Math.max(menteeArtists.length, 1);
+  const mentorDiversity = mentorGenres.size / Math.max(validMentorArtists.length, 1);
+  const menteeDiversity = menteeGenres.size / Math.max(validMenteeArtists.length, 1);
+  
+  debugLog(`    🎭 Musical Diversity Debug:`);
+  debugLog(`      Mentor: ${mentorGenres.size} genres / ${validMentorArtists.length} artists = ${mentorDiversity.toFixed(4)}`);
+  debugLog(`      Mentee: ${menteeGenres.size} genres / ${validMenteeArtists.length} artists = ${menteeDiversity.toFixed(4)}`);
   
   // Reward pairs where both have diverse tastes (more likely to discover new music together)
   // Use harmonic mean to ensure both have good diversity
-  if (mentorDiversity === 0 || menteeDiversity === 0) return 0;
+  if (mentorDiversity === 0 || menteeDiversity === 0) {
+    debugLog(`      Result: 0 (one person has no diversity)`);
+    return 0;
+  }
   
-  return (2 * mentorDiversity * menteeDiversity) / (mentorDiversity + menteeDiversity);
+  const harmonicMean = (2 * mentorDiversity * menteeDiversity) / (mentorDiversity + menteeDiversity);
+  debugLog(`      Harmonic Mean: ${harmonicMean.toFixed(4)}`);
+  
+  return harmonicMean;
 }
 
 function calculateMusicalCompatibility(mentor, mentee, weight) {
@@ -692,12 +802,26 @@ function calculateMusicalCompatibility(mentor, mentee, weight) {
   const genreSimilarity = calculateGenreSimilarity(mentorArtists, menteeArtists);
   const musicalDiversity = calculateMusicalDiversity(mentorArtists, menteeArtists);
   
+  // 🐛 DEBUG: Log the raw musical data and calculations
+  debugLog(`🎵 Musical Compatibility Debug:`);
+  debugLog(`  Mentor Artists:`, mentorArtists.map(a => ({ name: a.displayName, genres: a.genres })));
+  debugLog(`  Mentee Artists:`, menteeArtists.map(a => ({ name: a.displayName, genres: a.genres })));
+  debugLog(`  Artist Overlap: ${artistOverlap.toFixed(4)}`);
+  debugLog(`  Genre Similarity: ${genreSimilarity.toFixed(4)}`);
+  debugLog(`  Musical Diversity: ${musicalDiversity.toFixed(4)}`);
+  
   // Weighted combination:
-  // - Artist overlap: 40% (direct shared interests)
-  // - Genre similarity: 40% (broader musical compatibility)
+  // - Artist overlap: 30% (direct shared interests)
+  // - Genre similarity: 50% (broader musical compatibility)  
   // - Musical diversity: 20% (potential for mutual discovery)
   const combinedScore = (artistOverlap * 0.3) + (genreSimilarity * 0.5) + (musicalDiversity * 0.2);
   const finalScore = combinedScore * mapWeight(weight);
+  
+  debugLog(`  Formula: (${artistOverlap.toFixed(4)} × 0.3) + (${genreSimilarity.toFixed(4)} × 0.5) + (${musicalDiversity.toFixed(4)} × 0.2)`);
+  debugLog(`  Combined Score: ${combinedScore.toFixed(4)}`);
+  debugLog(`  Weight: ${weight} (${mapWeight(weight)}x)`);
+  debugLog(`  Final Score: ${finalScore.toFixed(4)}`);
+  debugLog(`  ==================`);
   
   return {
     score: finalScore,
@@ -741,26 +865,42 @@ async function optimizeAssignments(mentees, mentors, settings) {
 
   // Initialize mentor tracking
   mentors.forEach(mentor => {
+    const capacity = getMentorCapacity(mentor);
+    debugLog(`👨‍🏫 Mentor ${mentor.first_name} ${mentor.last_name} (ID: ${mentor.id}) - Capacity: ${capacity} (open_to_multiple: ${mentor.open_to_multiple})`);
     mentorAssignments.set(mentor.id, {
       mentor: mentor,
-      capacity: getMentorCapacity(mentor),
+      capacity: capacity,
       assigned: 0,
       mentees: []
     });
   });
 
   // Greedy assignment based on scores
+  debugLog(`🎯 Processing ${allPairs.length} potential mentor-mentee pairs (sorted by score):`);
+  allPairs.slice(0, 5).forEach((pair, idx) => {
+    debugLog(`  ${idx + 1}. Mentor ${pair.mentor.first_name} + Mentee ${pair.mentee.first_name} = ${pair.score.toFixed(2)}`);
+  });
+
   for (const pair of allPairs) {
     const { menteeId, mentorId, score, details, mentee, mentor } = pair;
 
+    debugLog(`🔄 Evaluating: Mentor ${mentor.first_name} (ID: ${mentorId}) + Mentee ${mentee.first_name} (ID: ${menteeId}) = ${score.toFixed(2)}`);
+
     // Skip if mentee is already assigned
-    if (menteeAssignments.has(menteeId)) continue;
+    if (menteeAssignments.has(menteeId)) {
+      debugLog(`  ❌ Mentee ${mentee.first_name} already assigned`);
+      continue;
+    }
 
     // Skip if mentor is at capacity
     const mentorInfo = mentorAssignments.get(mentorId);
-    if (mentorInfo.assigned >= mentorInfo.capacity) continue;
+    if (mentorInfo.assigned >= mentorInfo.capacity) {
+      debugLog(`  ❌ Mentor ${mentor.first_name} at capacity (${mentorInfo.assigned}/${mentorInfo.capacity})`);
+      continue;
+    }
 
     // Make the assignment
+    debugLog(`  ✅ Assigning Mentee ${mentee.first_name} to Mentor ${mentor.first_name} (${mentorInfo.assigned + 1}/${mentorInfo.capacity})`);
     mentorInfo.assigned++;
     mentorInfo.mentees.push({
       mentee: {
@@ -805,6 +945,29 @@ async function optimizeAssignments(mentees, mentors, settings) {
 async function calculateSimilarity(mentor, mentee, weights) {
   let score = 0;
   let details = {}; // For debugging
+
+  // Preferred Student ID Match (highest priority)
+  let preferredIdBonus = 0;
+  const mentorPrefersSpecificMentee = mentor.preferred_student_id && mentor.preferred_student_id === mentee.student_id;
+  const menteePrefersSpecificMentor = mentee.preferred_student_id && mentee.preferred_student_id === mentor.student_id;
+  
+  if (mentorPrefersSpecificMentee || menteePrefersSpecificMentor) {
+    preferredIdBonus = 100; // Massive bonus to ensure preferred matches happen
+    score += preferredIdBonus;
+    details.preferredId = {
+      score: preferredIdBonus,
+      mentorRequestedMentee: mentorPrefersSpecificMentee,
+      menteeRequestedMentor: menteePrefersSpecificMentor,
+      matched: true
+    };
+  } else {
+    details.preferredId = {
+      score: 0,
+      mentorRequestedMentee: false,
+      menteeRequestedMentor: false,
+      matched: false
+    };
+  }
 
   // Major Match (bidirectional - considers both mentor and mentee preferences)
   const menteeWantsMajorMatch = mentee.mentee_in_major === "Yes";
@@ -990,7 +1153,7 @@ async function calculateSimilarity(mentor, mentee, weights) {
 // Generate matches endpoint with mentor capacity management
 app.get("/api/generate-matches", async (req, res) => {
   try {
-    console.log("🔄 Generating matches with mentor capacity management...");
+    debugLog("🔄 Generating matches with mentor capacity management...");
     
     const result = await pool.query("SELECT * FROM mentor_mentee_submissions ORDER BY created_at DESC");
     const settingsResult = await pool.query("SELECT * FROM match_settings LIMIT 1");
@@ -1002,17 +1165,40 @@ app.get("/api/generate-matches", async (req, res) => {
     const submissions = result.rows;
     const settings = settingsResult.rows[0];
 
-    const mentors = submissions.filter(s => s.role === "mentor");
-    const mentees = submissions.filter(s => s.role === "mentee");
+    // Get already matched users from approved matches
+    const approvedMatchesResult = await pool.query("SELECT mentor_id, mentee_id FROM approved_matches");
+    const matchedUserIds = new Set();
+    
+    approvedMatchesResult.rows.forEach(row => {
+      matchedUserIds.add(row.mentor_id);
+      matchedUserIds.add(row.mentee_id);
+    });
 
-    console.log(`Found ${mentors.length} mentors and ${mentees.length} mentees`);
+    // Filter out already-matched users
+    const allMentors = submissions.filter(s => s.role === "mentor");
+    const allMentees = submissions.filter(s => s.role === "mentee");
+    
+    const mentors = allMentors.filter(mentor => !matchedUserIds.has(mentor.id));
+    const mentees = allMentees.filter(mentee => !matchedUserIds.has(mentee.id));
+
+    debugLog(`Found ${allMentors.length} total mentors (${mentors.length} unmatched) and ${allMentees.length} total mentees (${mentees.length} unmatched)`);
+    
+    if (matchedUserIds.size > 0) {
+      debugLog(`🔒 Filtered out ${matchedUserIds.size} already-matched users`);
+    }
 
     if (mentors.length === 0) {
-      return res.json({ message: "No mentors available for matching.", matches: [] });
+      const message = allMentors.length === 0 
+        ? "No mentors available for matching." 
+        : "No unmatched mentors available. All mentors have already been matched.";
+      return res.json({ message, matches: [] });
     }
 
     if (mentees.length === 0) {
-      return res.json({ message: "No mentees to match.", matches: [] });
+      const message = allMentees.length === 0 
+        ? "No mentees to match." 
+        : "No unmatched mentees available. All mentees have already been matched.";
+      return res.json({ message, matches: [] });
     }
 
     // Use capacity-aware assignment optimization
@@ -1090,7 +1276,113 @@ app.get("/api/generate-matches", async (req, res) => {
       }
     });
 
-    console.log("✅ Capacity-aware matches generated successfully");
+    debugLog("✅ Capacity-aware matches generated successfully");
+
+    // Check for potential improvements to existing matches
+    debugLog("🔍 Checking for potential match improvements...");
+    const potentialImprovements = [];
+    
+    if (approvedMatchesResult.rows.length > 0) {
+      // Get full data for already matched users
+      const matchedMentors = allMentors.filter(mentor => matchedUserIds.has(mentor.id));
+      const matchedMentees = allMentees.filter(mentee => matchedUserIds.has(mentee.id));
+      
+      // Check if any new mentors could better match existing mentees
+      for (const newMentor of mentors) {
+        for (const existingMentee of matchedMentees) {
+          const newScore = await calculateSimilarity(newMentor, existingMentee, settings);
+          
+          // Find the current match for this mentee
+          const currentMatch = approvedMatchesResult.rows.find(row => row.mentee_id === existingMentee.id);
+          if (currentMatch) {
+            const currentScore = parseFloat(currentMatch.match_score);
+            
+            if (newScore.score > currentScore + 0.5) { // Only suggest if significantly better
+              potentialImprovements.push({
+                type: 'better_mentor',
+                currentMatch: {
+                  id: currentMatch.id,
+                  mentorId: currentMatch.mentor_id,
+                  menteeId: currentMatch.mentee_id,
+                  currentScore: currentScore
+                },
+                newMatch: {
+                  mentor: {
+                    id: newMentor.id,
+                    firstName: newMentor.first_name,
+                    lastName: newMentor.last_name,
+                    email: newMentor.email,
+                    major: newMentor.major,
+                    year: newMentor.year
+                  },
+                  mentee: {
+                    id: existingMentee.id,
+                    firstName: existingMentee.first_name,
+                    lastName: existingMentee.last_name,
+                    email: existingMentee.email,
+                    major: existingMentee.major,
+                    year: existingMentee.year
+                  },
+                  newScore: newScore.score,
+                  improvementAmount: newScore.score - currentScore,
+                  details: newScore.details
+                }
+              });
+            }
+          }
+        }
+      }
+      
+      // Check if any new mentees could better match existing mentors
+      for (const newMentee of mentees) {
+        for (const existingMentor of matchedMentors) {
+          const newScore = await calculateSimilarity(existingMentor, newMentee, settings);
+          
+          // Find the current match for this mentor
+          const currentMatch = approvedMatchesResult.rows.find(row => row.mentor_id === existingMentor.id);
+          if (currentMatch) {
+            const currentScore = parseFloat(currentMatch.match_score);
+            
+            if (newScore.score > currentScore + 0.5) { // Only suggest if significantly better
+              potentialImprovements.push({
+                type: 'better_mentee',
+                currentMatch: {
+                  id: currentMatch.id,
+                  mentorId: currentMatch.mentor_id,
+                  menteeId: currentMatch.mentee_id,
+                  currentScore: currentScore
+                },
+                newMatch: {
+                  mentor: {
+                    id: existingMentor.id,
+                    firstName: existingMentor.first_name,
+                    lastName: existingMentor.last_name,
+                    email: existingMentor.email,
+                    major: existingMentor.major,
+                    year: existingMentor.year
+                  },
+                  mentee: {
+                    id: newMentee.id,
+                    firstName: newMentee.first_name,
+                    lastName: newMentee.last_name,
+                    email: newMentee.email,
+                    major: newMentee.major,
+                    year: newMentee.year
+                  },
+                  newScore: newScore.score,
+                  improvementAmount: newScore.score - currentScore,
+                  details: newScore.details
+                }
+              });
+            }
+          }
+        }
+      }
+      
+      if (potentialImprovements.length > 0) {
+        debugLog(`🚨 Found ${potentialImprovements.length} potential match improvements`);
+      }
+    }
     
     const totalCapacity = mentors.reduce((sum, mentor) => sum + getMentorCapacity(mentor), 0);
     const totalAssigned = assignmentResult.assignments.length;
@@ -1099,6 +1391,7 @@ app.get("/api/generate-matches", async (req, res) => {
       mentorMatches,
       menteeMatches,
       unassignedMentees,
+      potentialImprovements,
       summary: {
         totalMentors: mentors.length,
         totalMentees: mentees.length,
@@ -1107,6 +1400,7 @@ app.get("/api/generate-matches", async (req, res) => {
         utilizationRate: totalCapacity > 0 ? (totalAssigned / totalCapacity * 100).toFixed(1) : "0.0",
         unassignedCount: unassignedMentees.length,
         mentorsOpenToMultiple: mentors.filter(m => m.open_to_multiple === "Yes").length,
+        potentialImprovementsCount: potentialImprovements.length,
         settings: settings
       }
     });
@@ -1114,6 +1408,191 @@ app.get("/api/generate-matches", async (req, res) => {
   } catch (err) {
     console.error("Error generating matches:", err);
     res.status(500).json({ error: "Match generation failed.", detail: err.message });
+  }
+});
+
+// Approved Matches endpoints
+app.post("/api/approved-matches", async (req, res) => {
+  try {
+    const { match } = req.body;
+    
+    if (!match || !match.mentor || !match.assignedMentees || !match.assignedMentees[0]) {
+      return res.status(400).json({ error: "Invalid match data provided" });
+    }
+
+    const mentee = match.assignedMentees[0];
+    
+    const result = await pool.query(`
+      INSERT INTO approved_matches (
+        mentor_id, mentee_id, mentor_data, mentee_data, 
+        match_score, match_details, approved_by
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+      ON CONFLICT (mentor_id, mentee_id) 
+      DO UPDATE SET 
+        match_score = EXCLUDED.match_score,
+        match_details = EXCLUDED.match_details,
+        approved_at = NOW(),
+        approved_by = EXCLUDED.approved_by
+      RETURNING id, approved_at;
+    `, [
+      match.mentor.id,
+      mentee.mentee.id,
+      JSON.stringify(match.mentor),
+      JSON.stringify(mentee.mentee),
+      mentee.score,
+      JSON.stringify(mentee.details),
+      req.body.approvedBy || 'admin'
+    ]);
+
+            debugLog(`✅ Match approved and saved: Mentor ${match.mentor.firstName} ${match.mentor.lastName} & Mentee ${mentee.mentee.firstName} ${mentee.mentee.lastName}`);
+    
+    res.json({ 
+      success: true, 
+      id: result.rows[0].id,
+      approvedAt: result.rows[0].approved_at,
+      message: "Match approved and saved successfully" 
+    });
+
+  } catch (err) {
+    console.error("Error saving approved match:", err);
+    res.status(500).json({ error: "Failed to save approved match", detail: err.message });
+  }
+});
+
+app.get("/api/approved-matches", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        id,
+        mentor_id,
+        mentee_id,
+        mentor_data,
+        mentee_data,
+        match_score,
+        match_details,
+        approved_at,
+        approved_by
+      FROM approved_matches 
+      ORDER BY approved_at DESC
+    `);
+
+    const approvedMatches = result.rows.map(row => ({
+      id: row.id,
+      mentor: row.mentor_data,
+      assignedMentees: [{
+        mentee: row.mentee_data,
+        score: parseFloat(row.match_score),
+        details: row.match_details
+      }],
+      approvedAt: row.approved_at,
+      approvedBy: row.approved_by
+    }));
+
+    res.json(approvedMatches);
+
+  } catch (err) {
+    console.error("Error fetching approved matches:", err);
+    res.status(500).json({ error: "Failed to fetch approved matches", detail: err.message });
+  }
+});
+
+app.delete("/api/approved-matches/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await pool.query(
+      "DELETE FROM approved_matches WHERE id = $1 RETURNING mentor_data->>'firstName' as mentor_name, mentee_data->>'firstName' as mentee_name",
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Approved match not found" });
+    }
+
+    debugLog(`✅ Approved match removed: ${result.rows[0].mentor_name} & ${result.rows[0].mentee_name}`);
+    
+    res.json({ 
+      success: true, 
+      message: "Approved match removed successfully" 
+    });
+
+  } catch (err) {
+    console.error("Error removing approved match:", err);
+    res.status(500).json({ error: "Failed to remove approved match", detail: err.message });
+  }
+});
+
+// Replace approved match with a better one
+app.put("/api/approved-matches/:id/replace", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { newMatch } = req.body;
+    
+    if (!newMatch || !newMatch.mentor || !newMatch.mentee) {
+      return res.status(400).json({ error: "Invalid new match data provided" });
+    }
+
+    // Start transaction
+    await pool.query('BEGIN');
+
+    try {
+      // Get the current match data
+      const currentMatchResult = await pool.query(
+        "SELECT * FROM approved_matches WHERE id = $1",
+        [id]
+      );
+
+      if (currentMatchResult.rows.length === 0) {
+        await pool.query('ROLLBACK');
+        return res.status(404).json({ error: "Current match not found" });
+      }
+
+      const currentMatch = currentMatchResult.rows[0];
+
+      // Update the match with new data
+      const updateResult = await pool.query(`
+        UPDATE approved_matches SET
+          mentor_id = $1,
+          mentee_id = $2,
+          mentor_data = $3,
+          mentee_data = $4,
+          match_score = $5,
+          match_details = $6,
+          approved_at = NOW(),
+          approved_by = $7
+        WHERE id = $8
+        RETURNING id, approved_at;
+      `, [
+        newMatch.mentor.id,
+        newMatch.mentee.id,
+        JSON.stringify(newMatch.mentor),
+        JSON.stringify(newMatch.mentee),
+        newMatch.newScore,
+        JSON.stringify(newMatch.details),
+        req.body.approvedBy || 'admin',
+        id
+      ]);
+
+      await pool.query('COMMIT');
+
+      debugLog(`🔄 Match replaced: ${currentMatch.mentor_data.firstName} ${currentMatch.mentor_data.lastName} & ${currentMatch.mentee_data.firstName} ${currentMatch.mentee_data.lastName} → ${newMatch.mentor.firstName} ${newMatch.mentor.lastName} & ${newMatch.mentee.firstName} ${newMatch.mentee.lastName} (${newMatch.improvementAmount.toFixed(2)} point improvement)`);
+      
+      res.json({ 
+        success: true, 
+        id: updateResult.rows[0].id,
+        approvedAt: updateResult.rows[0].approved_at,
+        improvementAmount: newMatch.improvementAmount,
+        message: "Match replaced successfully" 
+      });
+
+    } catch (err) {
+      await pool.query('ROLLBACK');
+      throw err;
+    }
+
+  } catch (err) {
+    console.error("Error replacing approved match:", err);
+    res.status(500).json({ error: "Failed to replace approved match", detail: err.message });
   }
 });
 
@@ -1281,7 +1760,7 @@ async function createAssignmentsTable() {
         UNIQUE(mentee_id)
       )
     `);
-    console.log("✅ Assignments table ready");
+    debugLog("✅ Assignments table ready");
   } catch (err) {
     console.error("Failed to create assignments table:", err);
   }
@@ -1299,7 +1778,7 @@ app.post("/api/submit-assignments", strictRateLimit, async (req, res) => {
       return res.status(400).json({ error: "Assignments must be an array" });
     }
 
-    console.log(`📝 Submitting ${assignments.length} mentor-mentee assignments...`);
+    debugLog(`📝 Submitting ${assignments.length} mentor-mentee assignments...`);
 
     // Clear existing assignments (start fresh)
     await pool.query("DELETE FROM mentor_mentee_assignments");
@@ -1314,7 +1793,7 @@ app.post("/api/submit-assignments", strictRateLimit, async (req, res) => {
       `, [mentorId, menteeId, score, JSON.stringify(details)]);
     }
 
-    console.log("✅ Assignments submitted successfully");
+    debugLog("✅ Assignments submitted successfully");
     res.json({ 
       message: "Assignments submitted successfully",
       count: assignments.length
@@ -1482,17 +1961,17 @@ app.delete("/api/submission/:id", async (req, res) => {
 
 app.get('/api/test/trait-vectors', async (req, res) => {
   try {
-    console.log('\n=== TRAIT VECTOR COMPARISON TEST ===\n');
+    debugLog('\n=== TRAIT VECTOR COMPARISON TEST ===\n');
     
     // 1. Load static traits list
     const staticTraits = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "src", "data", "traits.json")));
-    console.log(`📋 Static traits count: ${staticTraits.length}`);
-    console.log(`📋 First 5 static traits:`, staticTraits.slice(0, 5));
+    debugLog(`📋 Static traits count: ${staticTraits.length}`);
+    debugLog(`📋 First 5 static traits:`, staticTraits.slice(0, 5));
     
     // 2. Load cached trait vectors
     const cachedTraitKeys = Object.keys(traitVectors);
-    console.log(`💾 Cached trait vectors count: ${cachedTraitKeys.length}`);
-    console.log(`💾 First 5 cached traits:`, cachedTraitKeys.slice(0, 5));
+    debugLog(`💾 Cached trait vectors count: ${cachedTraitKeys.length}`);
+    debugLog(`💾 First 5 cached traits:`, cachedTraitKeys.slice(0, 5));
     
     // 3. Query database for user trait data
     const dbResult = await pool.query(`
@@ -1503,7 +1982,7 @@ app.get('/api/test/trait-vectors', async (req, res) => {
       LIMIT 5
     `);
     
-    console.log(`🗃️ Database submissions with traits: ${dbResult.rows.length}`);
+    debugLog(`🗃️ Database submissions with traits: ${dbResult.rows.length}`);
     
     const dbTraits = new Set();
     dbResult.rows.forEach(row => {
@@ -1512,8 +1991,8 @@ app.get('/api/test/trait-vectors', async (req, res) => {
       }
     });
     
-    console.log(`🗃️ Unique traits in database: ${dbTraits.size}`);
-    console.log(`🗃️ Sample DB traits:`, Array.from(dbTraits).slice(0, 5));
+    debugLog(`🗃️ Unique traits in database: ${dbTraits.size}`);
+    debugLog(`🗃️ Sample DB traits:`, Array.from(dbTraits).slice(0, 5));
     
     // 4. Find mismatches
     const mismatches = {
@@ -1523,33 +2002,33 @@ app.get('/api/test/trait-vectors', async (req, res) => {
       inCachedNotInStatic: cachedTraitKeys.filter(trait => !staticTraits.includes(trait))
     };
     
-    console.log('\n=== MISMATCHES FOUND ===');
-    console.log(`❌ Traits in DB but not in static list: ${mismatches.inDbNotInStatic.length}`);
+          debugLog('\n=== MISMATCHES FOUND ===');
+      debugLog(`❌ Traits in DB but not in static list: ${mismatches.inDbNotInStatic.length}`);
     if (mismatches.inDbNotInStatic.length > 0) {
-      console.log(`   Examples:`, mismatches.inDbNotInStatic.slice(0, 10));
+        debugLog(`   Examples:`, mismatches.inDbNotInStatic.slice(0, 10));
     }
     
-    console.log(`❌ Traits in static list but not cached: ${mismatches.inStaticNotCached.length}`);
+      debugLog(`❌ Traits in static list but not cached: ${mismatches.inStaticNotCached.length}`);
     if (mismatches.inStaticNotCached.length > 0) {
-      console.log(`   Examples:`, mismatches.inStaticNotCached.slice(0, 10));
+        debugLog(`   Examples:`, mismatches.inStaticNotCached.slice(0, 10));
     }
     
-    console.log(`❌ Traits in DB but not cached: ${mismatches.inDbNotCached.length}`);
+      debugLog(`❌ Traits in DB but not cached: ${mismatches.inDbNotCached.length}`);
     if (mismatches.inDbNotCached.length > 0) {
-      console.log(`   Examples:`, mismatches.inDbNotCached.slice(0, 10));
+        debugLog(`   Examples:`, mismatches.inDbNotCached.slice(0, 10));
     }
     
-    console.log(`❌ Traits cached but not in static list: ${mismatches.inCachedNotInStatic.length}`);
+      debugLog(`❌ Traits cached but not in static list: ${mismatches.inCachedNotInStatic.length}`);
     if (mismatches.inCachedNotInStatic.length > 0) {
-      console.log(`   Examples:`, mismatches.inCachedNotInStatic.slice(0, 10));
+        debugLog(`   Examples:`, mismatches.inCachedNotInStatic.slice(0, 10));
     }
     
     // 5. Vector validation for DB entries
     const vectorIssues = [];
     dbResult.rows.forEach((row, index) => {
       if (row.trait_vectors) {
-        console.log(`🔍 Row ${index + 1} traits:`, row.personality_words);
-        console.log(`🔍 Row ${index + 1} vector count:`, row.trait_vectors ? row.trait_vectors.length : 0);
+        debugLog(`🔍 Row ${index + 1} traits:`, row.personality_words);
+        debugLog(`🔍 Row ${index + 1} vector count:`, row.trait_vectors ? row.trait_vectors.length : 0);
         
         if (row.personality_words.length !== (row.trait_vectors ? row.trait_vectors.length : 0)) {
           vectorIssues.push({
@@ -1562,10 +2041,10 @@ app.get('/api/test/trait-vectors', async (req, res) => {
       }
     });
     
-    console.log(`❌ Vector count mismatches: ${vectorIssues.length}`);
+          debugLog(`❌ Vector count mismatches: ${vectorIssues.length}`);
     vectorIssues.forEach(issue => {
-      console.log(`   Row ${issue.rowIndex}: Expected ${issue.expectedVectors} vectors, got ${issue.actualVectors}`);
-      console.log(`   Traits: ${issue.traits.join(', ')}`);
+        debugLog(`   Row ${issue.rowIndex}: Expected ${issue.expectedVectors} vectors, got ${issue.actualVectors}`);
+        debugLog(`   Traits: ${issue.traits.join(', ')}`);
     });
     
     res.json({
@@ -1587,4 +2066,4 @@ app.get('/api/test/trait-vectors', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
+app.listen(PORT, () => debugLog(`Backend running on port ${PORT}`));

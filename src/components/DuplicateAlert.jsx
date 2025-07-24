@@ -62,7 +62,7 @@ export default function DuplicateAlert() {
             Duplicate Submissions Detected
           </p>
           <p className="text-xs text-yellow-700">
-            {duplicates.count} duplicate{duplicates.count !== 1 ? 's' : ''} found. Click to review.
+            {duplicates.count} duplicate(s){duplicates.count !== 1 ? 's' : ''} found. Click to review.
           </p>
         </div>
         <div className="flex-shrink-0">
