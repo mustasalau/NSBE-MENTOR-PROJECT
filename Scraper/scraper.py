@@ -308,7 +308,7 @@ if __name__ == "__main__":
     print("🎓 Penn State Organizations Scraper")
     print("=" * 50)
     
-    URL = "https://orgcentral.psu.edu/organizations"
+    URL = "https://discover.psu.edu/organizations"
     OUTPUT_FILE = "clubs.xlsx"
 
     org_list = scrape_student_organizations(URL)
