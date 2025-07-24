@@ -94,7 +94,7 @@ def save_to_excel(data, filename):
 if __name__ == "__main__":
     URL = "https://orgcentral.psu.edu/organizations"
     DRIVER_PATH = None  # or "path/to/chromedriver"
-    OUTPUT_FILE = "/Users/msalau/Desktop/PSU_Student_Organizations.xlsx"
+    OUTPUT_FILE = "clubs.xlsx"  # Save to current directory for easier processing
 
     org_list = scrape_student_organizations(URL, DRIVER_PATH)
     save_to_excel(org_list, OUTPUT_FILE)

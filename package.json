@@ -7,7 +7,12 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "update-data": "node scripts/annual-data-update.js",
+    "update-clubs-only": "node src/utils/updateClubs.cjs",
+    "update-majors-only": "node src/utils/updateMajors.cjs",
+    "scrape-majors": "cd Scraper && python3 majorScraper.py",
+    "scrape-clubs": "cd Scraper && python3 scraper.py"
   },
   "keywords": [],
   "author": "",

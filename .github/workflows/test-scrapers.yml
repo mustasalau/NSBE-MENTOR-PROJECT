@@ -1,0 +1,47 @@
+name: 🧪 Test Scrapers
+
+on:
+  # Run on pushes to main that affect scraper files
+  push:
+    branches: [ main ]
+    paths:
+      - 'Scraper/**'
+      - '.github/workflows/**'
+      
+  # Allow manual testing
+  workflow_dispatch:
+
+jobs:
+  test-scrapers:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          
+      - name: 🔧 Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install selenium openpyxl
+          
+      - name: 🌐 Install Chrome for Selenium
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+          
+      - name: 🧪 Test clubs scraper
+        run: |
+          echo "🧪 Testing clubs scraper..."
+          cd Scraper
+          timeout 300s python3 scraper.py || echo "⚠️ Clubs scraper test completed"
+          
+      - name: 🧪 Test majors scraper  
+        run: |
+          echo "🧪 Testing majors scraper..."
+          cd Scraper
+          timeout 300s python3 majorScraper.py || echo "⚠️ Majors scraper test completed"

@@ -60,7 +60,7 @@ export default function SharedForm({ role, onSubmit }) {
   const [showTitle, setShowTitle] = useState(false);
   const [showMessage, setShowMessage] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const BASE_URL = import.meta.env.VITE_BACKEND_URL;
+  const BASE_URL = import.meta.env.VITE_BACKEND_URL || "https://nsbe-mentor-project.onrender.com";
 
   const errorMessages = {
     email: "Email should end with @psu.edu",
@@ -207,7 +207,7 @@ export default function SharedForm({ role, onSubmit }) {
 
   useEffect(() => {
     axios
-      .get(`${import.meta.env.VITE_BACKEND_URL}/api/traits/vectors`)
+      .get(`${import.meta.env.VITE_BACKEND_URL || "https://nsbe-mentor-project.onrender.com"}/api/traits/vectors`)
       .then((res) => {
         setTraitVectors(res.data);
         setTraitFuse(
@@ -450,7 +450,7 @@ export default function SharedForm({ role, onSubmit }) {
       if (unknownHobbies.length > 0) {
         console.log("🔄 Vectorizing unknown hobbies:", unknownHobbies);
         const res = await fetch(
-          `${import.meta.env.VITE_BACKEND_URL}/api/hobbies/normalize`,
+          `${import.meta.env.VITE_BACKEND_URL || "https://nsbe-mentor-project.onrender.com"}/api/hobbies/normalize`,
           {
             method: 'POST',
             headers: { "Content-Type": "application/json" },
@@ -463,7 +463,7 @@ export default function SharedForm({ role, onSubmit }) {
 
         // Reload vector list after backend updates
         const updated = await fetch(
-          `${import.meta.env.VITE_BACKEND_URL}/api/hobbies/vectors`,
+          `${import.meta.env.VITE_BACKEND_URL || "https://nsbe-mentor-project.onrender.com"}/api/hobbies/vectors`,
         );
         const vectors = await updated.json();
         setHobbyVectors(vectors);
@@ -485,7 +485,7 @@ export default function SharedForm({ role, onSubmit }) {
         console.log("🔄 Vectorizing unknown traits:", unknownTraits);
         for (const term of unknownTraits) {
           const res = await axios.post(
-            `${import.meta.env.VITE_BACKEND_URL}/api/traits/add`,
+            `${import.meta.env.VITE_BACKEND_URL || "https://nsbe-mentor-project.onrender.com"}/api/traits/add`,
             { trait: term },
           );
 
@@ -518,7 +518,7 @@ export default function SharedForm({ role, onSubmit }) {
 
       // Step 4: Submit to backend (which will handle expectations/ideal match vectorization)
       console.log("🔄 Submitting form data...");
-      const response = await fetch(import.meta.env.VITE_BACKEND_URL + '/api/submit', {
+      const response = await fetch((import.meta.env.VITE_BACKEND_URL || "https://nsbe-mentor-project.onrender.com") + '/api/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -648,7 +648,7 @@ export default function SharedForm({ role, onSubmit }) {
 
       searchTimeouts.current[index] = setTimeout(() => {
         fetch(
-          `${import.meta.env.VITE_BACKEND_URL}/api/spotify/search?query=${encodeURIComponent(value)}`,
+          `${import.meta.env.VITE_BACKEND_URL || "https://nsbe-mentor-project.onrender.com"}/api/spotify/search?query=${encodeURIComponent(value)}`,
         )
           .then((res) => res.json())
           .then((data) => {
