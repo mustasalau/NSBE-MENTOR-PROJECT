@@ -21,6 +21,18 @@ def setup_driver():
     import os
     is_ci = os.environ.get('CI') or os.environ.get('GITHUB_ACTIONS')
     
+    # Debug: Check for existing Chrome processes
+    if is_ci:
+        import subprocess
+        try:
+            result = subprocess.run(['pgrep', '-f', 'chrome'], capture_output=True, text=True)
+            if result.stdout.strip():
+                print(f"🔍 Found existing Chrome processes: {result.stdout.strip()}")
+            else:
+                print("🔍 No existing Chrome processes found")
+        except:
+            print("🔍 Could not check for existing Chrome processes")
+    
     # Add options for better compatibility
     if is_ci:
         # CI environment - must run headless with additional options
@@ -35,6 +47,11 @@ def setup_driver():
         chrome_options.add_argument('--disable-features=TranslateUI')
         chrome_options.add_argument('--disable-ipc-flooding-protection')
         chrome_options.add_argument('--remote-debugging-port=0')  # Use random port to avoid conflicts
+        chrome_options.add_argument('--single-process')  # Run in single process mode
+        chrome_options.add_argument('--disable-sync')  # Disable Chrome sync
+        chrome_options.add_argument('--disable-default-apps')  # Disable default apps
+        chrome_options.add_argument('--disable-web-security')  # Disable web security (for testing)
+        chrome_options.add_argument('--disable-features=VizDisplayCompositor')  # Disable compositor
         
         # Set correct Chrome binary path for GitHub Actions
         # Try multiple common Chrome/Chromium locations in CI environments
@@ -69,11 +86,29 @@ def setup_driver():
     chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
     
     # Add unique user data directory to avoid conflicts with other Chrome instances
-    temp_dir = tempfile.gettempdir()
+    # Try using /dev/shm for better performance in CI, fallback to temp dir
+    if is_ci and os.path.exists('/dev/shm'):
+        temp_dir = '/dev/shm'
+        print("🔍 Using /dev/shm for user data directory")
+    else:
+        temp_dir = tempfile.gettempdir()
+        print(f"🔍 Using temp directory: {temp_dir}")
+    
     unique_id = str(uuid.uuid4())[:8]
-    user_data_dir = os.path.join(temp_dir, f'chrome_clubs_scraper_{unique_id}')
+    timestamp = str(int(time.time()))
+    user_data_dir = os.path.join(temp_dir, f'chrome_clubs_scraper_{unique_id}_{timestamp}')
+    
+    # Ensure the directory doesn't exist and create it
+    if os.path.exists(user_data_dir):
+        print(f"⚠️ Directory already exists, removing: {user_data_dir}")
+        shutil.rmtree(user_data_dir, ignore_errors=True)
+    
+    os.makedirs(user_data_dir, exist_ok=True)
+    print(f"🗂️ Created unique user data directory: {user_data_dir}")
+    print(f"🔍 Directory exists: {os.path.exists(user_data_dir)}")
+    print(f"🔍 Directory writable: {os.access(user_data_dir, os.W_OK)}")
+    
     chrome_options.add_argument(f'--user-data-dir={user_data_dir}')
-    print(f"🗂️ Using unique user data directory: {user_data_dir}")
     
     # Store user_data_dir for cleanup
     setup_driver.user_data_dir = user_data_dir
@@ -82,7 +117,26 @@ def setup_driver():
         if is_ci:
             # In CI, use the system ChromeDriver (pre-installed by GitHub Actions)
             print("🤖 Running in CI mode - using system ChromeDriver")
-            driver = webdriver.Chrome(options=chrome_options)
+            
+            # First, try without custom user data directory
+            try:
+                print("🔄 Attempt 1: Default Chrome settings")
+                temp_options = Options()
+                temp_options.add_argument('--headless')
+                temp_options.add_argument('--no-sandbox')
+                temp_options.add_argument('--disable-dev-shm-usage')
+                temp_options.add_argument('--disable-gpu')
+                
+                if chrome_binary:
+                    temp_options.binary_location = chrome_binary
+                
+                driver = webdriver.Chrome(options=temp_options)
+                print("✅ Chrome WebDriver initialized successfully (default settings)")
+                return driver
+            except Exception as e1:
+                print(f"❌ Attempt 1 failed: {e1}")
+                print("🔄 Attempt 2: With custom user data directory")
+                driver = webdriver.Chrome(options=chrome_options)
         else:
             # Local development - use webdriver-manager for convenience
             print("💻 Running in local mode - using webdriver-manager")

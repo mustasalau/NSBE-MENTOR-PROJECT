@@ -74,6 +74,11 @@ jobs:
           echo "  ChromeDriver location: $(which chromedriver 2>/dev/null || echo 'Not found')"
           echo "  CI environment: $CI"
           echo "  GitHub Actions: $GITHUB_ACTIONS"
+          echo "  Temp directories:"
+          echo "    /tmp: $(test -d /tmp && echo 'Exists, writable: '$(test -w /tmp && echo 'Yes' || echo 'No') || echo 'Not found')"
+          echo "    /dev/shm: $(test -d /dev/shm && echo 'Exists, writable: '$(test -w /dev/shm && echo 'Yes' || echo 'No') || echo 'Not found')"
+          echo "  Chrome processes: $(pgrep -f chrome | wc -l) running"
+          echo "  Available disk space: $(df -h /tmp | tail -1 | awk '{print $4}') in /tmp"
           
           cd Scraper
           timeout 300s python3 scraper.py || echo "⚠️ Clubs scraper test completed"
