@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 
 const Home = () => {
   const videoRef = useRef(null);
-  const [isPlaying, setIsPlaying] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [showControls, setShowControls] = useState(false);
   const [videoError, setVideoError] = useState(false);
@@ -29,12 +29,17 @@ const Home = () => {
   };
 
   const handleVideoError = (e) => {
-    console.error('Video error:', e);
+    console.error('Video failed to load. Details:', {
+      error: e,
+      videoSrc: videoRef.current?.src,
+      readyState: videoRef.current?.readyState,
+      networkState: videoRef.current?.networkState
+    });
     setVideoError(true);
   };
 
-  const handleVideoLoad = () => {
-    console.log('Video loaded successfully');
+  const handleVideoLoaded = () => {
+    console.log('Video loaded successfully!');
     setVideoError(false);
   };
 
@@ -43,25 +48,27 @@ const Home = () => {
     document.body.style.overflow = 'hidden';
     
     if (video && !videoError) {
-      // Start muted to comply with autoplay policies
+      // Set up video
       video.muted = true;
       setIsMuted(true);
       
-      // Try to play when loaded
-      const playVideo = () => {
-        video.play().catch((err) => {
-          console.warn('Autoplay failed:', err);
-          // If autoplay fails, that's okay - user can still manually play
-        });
+      // Try to play when ready
+      const attemptPlay = () => {
+        video.play()
+          .then(() => {
+            console.log('Video started playing');
+            setIsPlaying(true);
+          })
+          .catch((err) => {
+            console.warn('Autoplay blocked, but video is ready:', err.message);
+          });
       };
 
-      if (video.readyState >= 3) {
-        // Video is already loaded
-        playVideo();
+      // If video is already loaded
+      if (video.readyState >= 2) {
+        attemptPlay();
       } else {
-        // Wait for video to load
-        video.addEventListener('loadeddata', playVideo);
-        return () => video.removeEventListener('loadeddata', playVideo);
+        video.addEventListener('loadeddata', attemptPlay, { once: true });
       }
     }
     
@@ -72,33 +79,35 @@ const Home = () => {
 
   return (
     <div className="relative h-screen w-full overflow-hidden">
-      {/* Video Background */}
+      {/* Video Background - Direct src, no source elements */}
       {!videoError ? (
         <video
           ref={videoRef}
+          src="/videos/NSBEVid.mp4"
           className="absolute top-0 left-0 w-full h-full object-cover"
           loop
           muted
           playsInline
-          preload="metadata"
+          preload="auto"
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
           onError={handleVideoError}
-          onLoadedData={handleVideoLoad}
-        >
-          {/* Multiple source formats for better compatibility */}
-          <source src="/videos/NSBEVid.mp4" type="video/quicktime" />
-          {/* Fallback message */}
-          Your browser does not support the video tag.
-        </video>
+          onLoadedData={handleVideoLoaded}
+        />
       ) : (
         /* Fallback background when video fails */
         <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900">
           <div className="absolute inset-0 bg-black/30" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-center text-white">
+              <p className="text-lg mb-2">Video unavailable</p>
+              <p className="text-sm opacity-75">Using fallback background</p>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Video Controls Overlay - only show if video is working */}
+      {/* Video Controls Overlay */}
       {!videoError && (
         <div 
           className="absolute top-4 right-4 z-20"
