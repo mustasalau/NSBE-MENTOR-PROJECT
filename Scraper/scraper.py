@@ -1,32 +1,58 @@
 import json
 import time
+import os
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 from selenium.common.exceptions import TimeoutException, WebDriverException, NoSuchElementException
+from webdriver_manager.chrome import ChromeDriverManager
 
 def setup_driver():
     """Set up Chrome WebDriver with appropriate options."""
     chrome_options = Options()
     
+    # Detect if running in CI environment
+    import os
+    is_ci = os.environ.get('CI') or os.environ.get('GITHUB_ACTIONS')
+    
     # Add options for better compatibility
-    # chrome_options.add_argument('--headless')  # Comment out to see the browser in action
-    chrome_options.add_argument('--no-sandbox')
-    chrome_options.add_argument('--disable-dev-shm-usage')
-    chrome_options.add_argument('--disable-gpu')
+    if is_ci:
+        # CI environment - must run headless with additional options
+        chrome_options.add_argument('--headless')
+        chrome_options.add_argument('--no-sandbox')
+        chrome_options.add_argument('--disable-dev-shm-usage')
+        chrome_options.add_argument('--disable-gpu')
+        chrome_options.add_argument('--disable-extensions')
+        chrome_options.add_argument('--disable-background-timer-throttling')
+        chrome_options.add_argument('--disable-backgrounding-occluded-windows')
+        chrome_options.add_argument('--disable-renderer-backgrounding')
+        chrome_options.add_argument('--disable-features=TranslateUI')
+        chrome_options.add_argument('--disable-ipc-flooding-protection')
+        chrome_options.add_argument('--remote-debugging-port=9222')
+    else:
+        # Local development - can run with visible browser for debugging
+        # chrome_options.add_argument('--headless')  # Uncomment for headless locally
+        chrome_options.add_argument('--no-sandbox')
+        chrome_options.add_argument('--disable-dev-shm-usage')
+        chrome_options.add_argument('--disable-gpu')
+    
     chrome_options.add_argument('--window-size=1920,1080')
     chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
     
     try:
-        driver = webdriver.Chrome(options=chrome_options)
+        # Use webdriver-manager to automatically handle ChromeDriver
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=chrome_options)
         return driver
     except WebDriverException as e:
         print(f"❌ Chrome WebDriver error: {e}")
-        print("💡 Make sure you have ChromeDriver installed:")
-        print("   - Install via: pip install webdriver-manager")
-        print("   - Or download from: https://chromedriver.chromium.org/")
+        print("💡 Troubleshooting steps:")
+        print("   - Make sure Chrome/Chromium is installed")
+        print("   - Install dependencies: pip install selenium webdriver-manager")
+        print("   - Check if you're in a headless environment (CI)")
         return None
 
 def clean_organization_name(name):

@@ -49,7 +49,7 @@ jobs:
       - name: 🔧 Install Python dependencies
         run: |
           pip install --upgrade pip
-          pip install selenium openpyxl
+          pip install -r Scraper/requirements.txt
           
       - name: 🔧 Install Node.js dependencies
         run: npm install
