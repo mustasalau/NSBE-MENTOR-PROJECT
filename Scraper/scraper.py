@@ -123,11 +123,22 @@ def setup_driver():
         shutil.rmtree(user_data_dir, ignore_errors=True)
     
     os.makedirs(user_data_dir, exist_ok=True)
+    
+    # Create the required profile directory structure
+    default_profile_dir = os.path.join(user_data_dir, 'Default')
+    os.makedirs(default_profile_dir, exist_ok=True)
+    
+    # Set proper permissions
+    os.chmod(user_data_dir, 0o755)
+    os.chmod(default_profile_dir, 0o755)
+    
     print(f"🗂️ Created unique user data directory: {user_data_dir}")
+    print(f"🗂️ Created profile directory: {default_profile_dir}")
     print(f"🔍 Directory exists: {os.path.exists(user_data_dir)}")
     print(f"🔍 Directory writable: {os.access(user_data_dir, os.W_OK)}")
     
     chrome_options.add_argument(f'--user-data-dir={user_data_dir}')
+    chrome_options.add_argument(f'--profile-directory=Default')
     
     # Store user_data_dir for cleanup
     setup_driver.user_data_dir = user_data_dir
@@ -149,12 +160,31 @@ def setup_driver():
                 temp_options.add_argument('--disable-extensions')  # Disable all extensions
                 temp_options.add_argument('--disable-plugins')  # Disable plugins
                 temp_options.add_argument('--disable-images')  # Speed up loading
+                temp_options.add_argument('--disable-web-security')  # Disable web security
+                temp_options.add_argument('--disable-features=VizDisplayCompositor')  # Disable compositor
+                temp_options.add_argument('--disable-background-timer-throttling')  # Disable throttling
+                temp_options.add_argument('--disable-backgrounding-occluded-windows')  # Disable backgrounding
+                temp_options.add_argument('--disable-renderer-backgrounding')  # Disable renderer backgrounding
+                temp_options.add_argument('--disable-component-update')  # Disable component updates
+                temp_options.add_argument('--disable-default-apps')  # Disable default apps
+                temp_options.add_argument('--disable-sync')  # Disable sync
                 
                 # Always use a unique user data directory, even for minimal setup
                 simple_user_dir = f'/dev/shm/chrome_simple_{unique_id}_{timestamp}'
                 os.makedirs(simple_user_dir, exist_ok=True)
+                
+                # Create the required profile directory structure
+                default_profile_dir = os.path.join(simple_user_dir, 'Default')
+                os.makedirs(default_profile_dir, exist_ok=True)
+                
+                # Set proper permissions
+                os.chmod(simple_user_dir, 0o755)
+                os.chmod(default_profile_dir, 0o755)
+                
                 temp_options.add_argument(f'--user-data-dir={simple_user_dir}')
+                temp_options.add_argument(f'--profile-directory=Default')
                 print(f"🗂️ Using simple user data directory: {simple_user_dir}")
+                print(f"🗂️ Created profile directory: {default_profile_dir}")
                 
                 if chrome_binary:
                     temp_options.binary_location = chrome_binary
@@ -168,7 +198,37 @@ def setup_driver():
             except Exception as e1:
                 print(f"❌ Attempt 1 failed: {e1}")
                 print("🔄 Attempt 2: With full Chrome options")
-                driver = webdriver.Chrome(options=chrome_options)
+                try:
+                    driver = webdriver.Chrome(options=chrome_options)
+                except Exception as e2:
+                    print(f"❌ Attempt 2 failed: {e2}")
+                    print("🔄 Attempt 3: Ultra-minimal Chrome with memory-only profile")
+                    
+                    # Last resort: try with in-memory user data directory
+                    ultra_options = Options()
+                    ultra_options.add_argument('--headless')
+                    ultra_options.add_argument('--no-sandbox')
+                    ultra_options.add_argument('--disable-dev-shm-usage')
+                    ultra_options.add_argument('--disable-gpu')
+                    ultra_options.add_argument('--memory-pressure-off')
+                    ultra_options.add_argument('--max_old_space_size=4000')
+                    ultra_options.add_argument('--disable-background-timer-throttling')
+                    ultra_options.add_argument('--disable-backgrounding-occluded-windows')
+                    ultra_options.add_argument('--disable-renderer-backgrounding')
+                    ultra_options.add_argument('--disable-extensions')
+                    ultra_options.add_argument('--disable-plugins')
+                    ultra_options.add_argument('--disable-images')
+                    ultra_options.add_argument('--disable-javascript')  # Disable JS for ultra-minimal
+                    ultra_options.add_argument('--virtual-time-budget=1000')
+                    
+                    # Try without any user data directory at all
+                    ultra_options.add_argument('--disable-web-security')
+                    ultra_options.add_argument('--disable-features=VizDisplayCompositor')
+                    
+                    if chrome_binary:
+                        ultra_options.binary_location = chrome_binary
+                    
+                    driver = webdriver.Chrome(options=ultra_options)
         else:
             # Local development - use webdriver-manager for convenience
             print("💻 Running in local mode - using webdriver-manager")

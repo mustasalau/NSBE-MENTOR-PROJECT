@@ -103,11 +103,22 @@ def setup_driver():
         shutil.rmtree(user_data_dir, ignore_errors=True)
     
     os.makedirs(user_data_dir, exist_ok=True)
+    
+    # Create the required profile directory structure
+    default_profile_dir = os.path.join(user_data_dir, 'Default')
+    os.makedirs(default_profile_dir, exist_ok=True)
+    
+    # Set proper permissions
+    os.chmod(user_data_dir, 0o755)
+    os.chmod(default_profile_dir, 0o755)
+    
     print(f"🗂️ Created unique user data directory: {user_data_dir}")
+    print(f"🗂️ Created profile directory: {default_profile_dir}")
     print(f"🔍 Directory exists: {os.path.exists(user_data_dir)}")
     print(f"🔍 Directory writable: {os.access(user_data_dir, os.W_OK)}")
     
     chrome_options.add_argument(f'--user-data-dir={user_data_dir}')
+    chrome_options.add_argument(f'--profile-directory=Default')
     
     # Store user_data_dir for cleanup
     setup_driver.user_data_dir = user_data_dir
@@ -133,8 +144,19 @@ def setup_driver():
                 # Always use a unique user data directory, even for minimal setup
                 simple_user_dir = f'/dev/shm/chrome_majors_simple_{unique_id}_{timestamp}'
                 os.makedirs(simple_user_dir, exist_ok=True)
+                
+                # Create the required profile directory structure
+                default_profile_dir = os.path.join(simple_user_dir, 'Default')
+                os.makedirs(default_profile_dir, exist_ok=True)
+                
+                # Set proper permissions
+                os.chmod(simple_user_dir, 0o755)
+                os.chmod(default_profile_dir, 0o755)
+                
                 temp_options.add_argument(f'--user-data-dir={simple_user_dir}')
+                temp_options.add_argument(f'--profile-directory=Default')
                 print(f"🗂️ Using simple user data directory: {simple_user_dir}")
+                print(f"🗂️ Created profile directory: {default_profile_dir}")
                 
                 if chrome_binary:
                     temp_options.binary_location = chrome_binary
