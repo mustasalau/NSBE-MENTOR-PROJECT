@@ -32,25 +32,6 @@ def setup_driver():
                 print("🔍 No existing Chrome processes found")
         except:
             print("🔍 Could not check for existing Chrome processes")
-        
-        # Check for common Chrome user data directories and lock files
-        common_paths = [
-            '/tmp/.com.google.Chrome*',
-            '/tmp/.org.chromium.Chromium*', 
-            '/home/runner/.config/google-chrome',
-            '/home/runner/.config/chromium',
-            '/root/.config/google-chrome',
-            '/root/.config/chromium'
-        ]
-        
-        for path_pattern in common_paths:
-            try:
-                import glob
-                matches = glob.glob(path_pattern)
-                if matches:
-                    print(f"🔍 Found existing Chrome data: {matches}")
-            except:
-                pass
     
     # Add options for better compatibility
     if is_ci:
@@ -65,21 +46,29 @@ def setup_driver():
         chrome_options.add_argument('--disable-renderer-backgrounding')
         chrome_options.add_argument('--disable-features=TranslateUI')
         chrome_options.add_argument('--disable-ipc-flooding-protection')
-        chrome_options.add_argument('--remote-debugging-port=0')  # Use random port to avoid conflicts
-        chrome_options.add_argument('--single-process')  # Run in single process mode
-        chrome_options.add_argument('--disable-sync')  # Disable Chrome sync
-        chrome_options.add_argument('--disable-default-apps')  # Disable default apps
-        chrome_options.add_argument('--disable-web-security')  # Disable web security (for testing)
-        chrome_options.add_argument('--disable-features=VizDisplayCompositor')  # Disable compositor
+        chrome_options.add_argument('--remote-debugging-port=0')
+        chrome_options.add_argument('--disable-sync')
+        chrome_options.add_argument('--disable-default-apps')
+        chrome_options.add_argument('--disable-web-security')
+        chrome_options.add_argument('--disable-features=VizDisplayCompositor')
+        chrome_options.add_argument('--no-first-run')
+        chrome_options.add_argument('--no-default-browser-check')
+        chrome_options.add_argument('--disable-translate')
+        chrome_options.add_argument('--disable-logging')
+        chrome_options.add_argument('--disable-plugins')
+        chrome_options.add_argument('--disable-images')  # Speed up loading
+        chrome_options.add_argument('--disable-component-update')
+        chrome_options.add_argument('--disable-client-side-phishing-detection')
+        chrome_options.add_argument('--disable-background-networking')
+        chrome_options.add_argument('--disable-features=MediaRouter')
         
         # Set correct Chrome binary path for GitHub Actions
-        # Try multiple common Chrome/Chromium locations in CI environments
         chrome_paths = [
-            '/snap/bin/chromium',                # Snap installation (most common in Ubuntu CI)
-            '/usr/bin/chromium-browser',         # Apt chromium-browser package
-            '/opt/google/chrome/google-chrome',  # browser-actions/setup-chrome
-            '/usr/bin/google-chrome',            # Default Chrome location
-            '/usr/bin/google-chrome-stable',     # Alternative Chrome name
+            '/snap/bin/chromium',
+            '/usr/bin/chromium-browser',
+            '/opt/google/chrome/google-chrome',
+            '/usr/bin/google-chrome',
+            '/usr/bin/google-chrome-stable',
         ]
         
         chrome_binary = None
@@ -95,8 +84,7 @@ def setup_driver():
         else:
             print("⚠️ No Chrome/Chromium binary found, trying without explicit path")
     else:
-        # Local development - can run with visible browser for debugging
-        # chrome_options.add_argument('--headless')  # Uncomment for headless locally
+        # Local development
         chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument('--disable-dev-shm-usage')
         chrome_options.add_argument('--disable-gpu')
@@ -104,8 +92,7 @@ def setup_driver():
     chrome_options.add_argument('--window-size=1920,1080')
     chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
     
-    # Add unique user data directory to avoid conflicts with other Chrome instances
-    # Try using /dev/shm for better performance in CI, fallback to temp dir
+    # Create proper user data directory with valid JSON files
     if is_ci and os.path.exists('/dev/shm'):
         temp_dir = '/dev/shm'
         print("🔍 Using /dev/shm for user data directory")
@@ -128,32 +115,67 @@ def setup_driver():
     default_profile_dir = os.path.join(user_data_dir, 'Default')
     os.makedirs(default_profile_dir, exist_ok=True)
     
-    # Set proper permissions (more permissive to allow Chrome to write files)
-    os.chmod(user_data_dir, 0o777)
-    os.chmod(default_profile_dir, 0o777)
+    # Set proper permissions
+    os.chmod(user_data_dir, 0o755)
+    os.chmod(default_profile_dir, 0o755)
     
-    # Create a basic preferences file to prevent Chrome from trying to write it
-    prefs_file = os.path.join(default_profile_dir, 'Preferences')
+    # Create proper JSON files with valid minimal content
     try:
+        # Create a proper Preferences file with minimal valid JSON
+        prefs_file = os.path.join(default_profile_dir, 'Preferences')
+        preferences_content = {
+            "profile": {
+                "default_content_setting_values": {
+                    "notifications": 2
+                },
+                "default_content_settings": {
+                    "popups": 0
+                },
+                "managed_default_content_settings": {
+                    "images": 1
+                }
+            },
+            "security_state": {
+                "revision": 0
+            }
+        }
         with open(prefs_file, 'w') as f:
-            f.write('{}')  # Empty JSON object
-        os.chmod(prefs_file, 0o666)
-        print(f"🗂️ Created preferences file: {prefs_file}")
-    except Exception as pref_error:
-        print(f"⚠️ Could not create preferences file: {pref_error}")
-    
-    # Create other necessary Chrome files
-    try:
-        # Create Local State file
+            json.dump(preferences_content, f, indent=2)
+        os.chmod(prefs_file, 0o644)
+        print(f"🗂️ Created proper preferences file: {prefs_file}")
+        
+        # Create a proper Local State file
         local_state_file = os.path.join(user_data_dir, 'Local State')
+        local_state_content = {
+            "background_mode": {
+                "enabled": False
+            },
+            "browser": {
+                "enabled_labs_experiments": []
+            },
+            "profile": {
+                "info_cache": {},
+                "last_used": "Default",
+                "last_active_profiles": ["Default"]
+            }
+        }
         with open(local_state_file, 'w') as f:
-            f.write('{}')
-        os.chmod(local_state_file, 0o666)
-        print(f"🗂️ Created local state file: {local_state_file}")
-    except Exception as state_error:
-        print(f"⚠️ Could not create local state file: {state_error}")
+            json.dump(local_state_content, f, indent=2)
+        os.chmod(local_state_file, 0o644)
+        print(f"🗂️ Created proper local state file: {local_state_file}")
+        
+        # Create First Run file to skip first run setup
+        first_run_file = os.path.join(user_data_dir, 'First Run')
+        with open(first_run_file, 'w') as f:
+            f.write('')
+        os.chmod(first_run_file, 0o644)
+        print(f"🗂️ Created first run file: {first_run_file}")
+        
+    except Exception as file_error:
+        print(f"⚠️ Could not create Chrome data files: {file_error}")
+        return None
     
-    print(f"🗂️ Created unique user data directory: {user_data_dir}")
+    print(f"🗂️ Created user data directory: {user_data_dir}")
     print(f"🗂️ Created profile directory: {default_profile_dir}")
     print(f"🔍 Directory exists: {os.path.exists(user_data_dir)}")
     print(f"🔍 Directory writable: {os.access(user_data_dir, os.W_OK)}")
@@ -166,166 +188,88 @@ def setup_driver():
     
     try:
         if is_ci:
-            # In CI, use the system ChromeDriver (pre-installed by GitHub Actions)
             print("🤖 Running in CI mode - using system ChromeDriver")
             
-            # First, try with a simple unique user data directory
+            # Try the simplest approach first - let Chrome create its own profile
             try:
-                print("🔄 Attempt 1: Minimal Chrome settings with unique user data dir")
-                temp_options = Options()
-                temp_options.add_argument('--headless')
-                temp_options.add_argument('--no-sandbox')
-                temp_options.add_argument('--disable-dev-shm-usage')
-                temp_options.add_argument('--disable-gpu')
-                temp_options.add_argument('--incognito')  # Run in incognito mode
-                temp_options.add_argument('--disable-extensions')  # Disable all extensions
-                temp_options.add_argument('--disable-plugins')  # Disable plugins
-                temp_options.add_argument('--disable-images')  # Speed up loading
-                temp_options.add_argument('--disable-web-security')  # Disable web security
-                temp_options.add_argument('--disable-features=VizDisplayCompositor')  # Disable compositor
-                temp_options.add_argument('--disable-background-timer-throttling')  # Disable throttling
-                temp_options.add_argument('--disable-backgrounding-occluded-windows')  # Disable backgrounding
-                temp_options.add_argument('--disable-renderer-backgrounding')  # Disable renderer backgrounding
-                temp_options.add_argument('--disable-component-update')  # Disable component updates
-                temp_options.add_argument('--disable-default-apps')  # Disable default apps
-                temp_options.add_argument('--disable-sync')  # Disable sync
-                temp_options.add_argument('--disable-client-side-phishing-detection')  # Disable phishing detection
-                temp_options.add_argument('--disable-background-networking')  # Disable background networking
-                temp_options.add_argument('--disable-features=MediaRouter')  # Disable media router
-                temp_options.add_argument('--disable-ipc-flooding-protection')  # Disable IPC protection
-                temp_options.add_argument('--no-first-run')  # Skip first run experience
-                temp_options.add_argument('--no-default-browser-check')  # Skip default browser check
-                temp_options.add_argument('--disable-translate')  # Disable translate
-                
-                # Always use a unique user data directory, even for minimal setup
-                simple_user_dir = f'/dev/shm/chrome_simple_{unique_id}_{timestamp}'
-                os.makedirs(simple_user_dir, exist_ok=True)
-                
-                # Create the required profile directory structure
-                default_profile_dir = os.path.join(simple_user_dir, 'Default')
-                os.makedirs(default_profile_dir, exist_ok=True)
-                
-                # Set proper permissions (more permissive to allow Chrome to write files)
-                os.chmod(simple_user_dir, 0o777)
-                os.chmod(default_profile_dir, 0o777)
-                
-                # Create a basic preferences file to prevent Chrome from trying to write it
-                prefs_file = os.path.join(default_profile_dir, 'Preferences')
-                try:
-                    with open(prefs_file, 'w') as f:
-                        f.write('{}')  # Empty JSON object
-                    os.chmod(prefs_file, 0o666)
-                    print(f"🗂️ Created preferences file: {prefs_file}")
-                except Exception as pref_error:
-                    print(f"⚠️ Could not create preferences file: {pref_error}")
-                
-                # Create other necessary Chrome files
-                try:
-                    # Create Local State file
-                    local_state_file = os.path.join(simple_user_dir, 'Local State')
-                    with open(local_state_file, 'w') as f:
-                        f.write('{}')
-                    os.chmod(local_state_file, 0o666)
-                    print(f"🗂️ Created local state file: {local_state_file}")
-                except Exception as state_error:
-                    print(f"⚠️ Could not create local state file: {state_error}")
-                
-                temp_options.add_argument(f'--user-data-dir={simple_user_dir}')
-                temp_options.add_argument(f'--profile-directory=Default')
-                print(f"🗂️ Using simple user data directory: {simple_user_dir}")
-                print(f"🗂️ Created profile directory: {default_profile_dir}")
+                print("🔄 Attempt 1: Using incognito mode (no user data persistence)")
+                simple_options = Options()
+                simple_options.add_argument('--headless')
+                simple_options.add_argument('--no-sandbox')
+                simple_options.add_argument('--disable-dev-shm-usage')
+                simple_options.add_argument('--disable-gpu')
+                simple_options.add_argument('--incognito')  # Use incognito mode
+                simple_options.add_argument('--disable-extensions')
+                simple_options.add_argument('--disable-plugins')
+                simple_options.add_argument('--disable-images')
+                simple_options.add_argument('--disable-web-security')
+                simple_options.add_argument('--disable-features=VizDisplayCompositor')
+                simple_options.add_argument('--no-first-run')
+                simple_options.add_argument('--no-default-browser-check')
+                simple_options.add_argument('--disable-sync')
+                simple_options.add_argument('--disable-background-networking')
+                simple_options.add_argument('--disable-translate')
+                simple_options.add_argument('--disable-logging')
+                simple_options.add_argument('--disable-component-update')
+                simple_options.add_argument('--disable-default-apps')
+                simple_options.add_argument('--disable-client-side-phishing-detection')
+                simple_options.add_argument('--disable-background-timer-throttling')
+                simple_options.add_argument('--disable-backgrounding-occluded-windows')
+                simple_options.add_argument('--disable-renderer-backgrounding')
+                simple_options.add_argument('--disable-ipc-flooding-protection')
+                simple_options.add_argument('--disable-features=MediaRouter')
                 
                 if chrome_binary:
-                    temp_options.binary_location = chrome_binary
+                    simple_options.binary_location = chrome_binary
                 
-                driver = webdriver.Chrome(options=temp_options)
-                print("✅ Chrome WebDriver initialized successfully (minimal settings)")
-                
-                # Store for cleanup
-                setup_driver.simple_user_data_dir = simple_user_dir
+                driver = webdriver.Chrome(options=simple_options)
+                print("✅ Chrome WebDriver initialized successfully (incognito mode)")
                 return driver
+                
             except Exception as e1:
                 print(f"❌ Attempt 1 failed: {e1}")
-                print("🔄 Attempt 2: With full Chrome options")
+                
                 try:
+                    print("🔄 Attempt 2: Using temporary profile with proper JSON files")
                     driver = webdriver.Chrome(options=chrome_options)
+                    print("✅ Chrome WebDriver initialized successfully (temporary profile)")
+                    return driver
+                    
                 except Exception as e2:
                     print(f"❌ Attempt 2 failed: {e2}")
-                    print("🔄 Attempt 3: Ultra-minimal Chrome with memory-only profile")
                     
-                    # Last resort: try with completely temporary approach
-                    ultra_options = Options()
-                    ultra_options.add_argument('--headless')
-                    ultra_options.add_argument('--no-sandbox')
-                    ultra_options.add_argument('--disable-dev-shm-usage')
-                    ultra_options.add_argument('--disable-gpu')
-                    ultra_options.add_argument('--disable-extensions')
-                    ultra_options.add_argument('--disable-plugins')
-                    ultra_options.add_argument('--disable-images')
-                    ultra_options.add_argument('--disable-web-security')
-                    ultra_options.add_argument('--disable-features=VizDisplayCompositor')
-                    ultra_options.add_argument('--no-first-run')
-                    ultra_options.add_argument('--no-default-browser-check')
-                    ultra_options.add_argument('--disable-sync')
-                    ultra_options.add_argument('--disable-background-networking')
-                    ultra_options.add_argument('--disable-background-timer-throttling')
-                    ultra_options.add_argument('--disable-client-side-phishing-detection')
-                    ultra_options.add_argument('--disable-component-update')
-                    ultra_options.add_argument('--disable-default-apps')
-                    ultra_options.add_argument('--disable-translate')
-                    ultra_options.add_argument('--disable-logging')
-                    ultra_options.add_argument('--silent')
-                    
-                    # Try with a super simple temp directory
-                    import tempfile
-                    ultra_temp_dir = tempfile.mkdtemp(prefix='chrome_ultra_', dir='/dev/shm')
-                    ultra_options.add_argument(f'--user-data-dir={ultra_temp_dir}')
-                    print(f"🗂️ Ultra-minimal temp directory: {ultra_temp_dir}")
-                    
-                    if chrome_binary:
-                        ultra_options.binary_location = chrome_binary
-                    
-                    driver = webdriver.Chrome(options=ultra_options)
+                    try:
+                        print("🔄 Attempt 3: Minimal options without user data directory")
+                        minimal_options = Options()
+                        minimal_options.add_argument('--headless')
+                        minimal_options.add_argument('--no-sandbox')
+                        minimal_options.add_argument('--disable-dev-shm-usage')
+                        minimal_options.add_argument('--disable-gpu')
+                        minimal_options.add_argument('--disable-extensions')
+                        minimal_options.add_argument('--no-first-run')
+                        minimal_options.add_argument('--disable-default-apps')
+                        minimal_options.add_argument('--disable-sync')
+                        
+                        if chrome_binary:
+                            minimal_options.binary_location = chrome_binary
+                        
+                        driver = webdriver.Chrome(options=minimal_options)
+                        print("✅ Chrome WebDriver initialized successfully (minimal options)")
+                        return driver
+                        
+                    except Exception as e3:
+                        print(f"❌ All attempts failed. Final error: {e3}")
+                        return None
         else:
-            # Local development - use webdriver-manager for convenience
+            # Local development
             print("💻 Running in local mode - using webdriver-manager")
             service = Service(ChromeDriverManager().install())
             driver = webdriver.Chrome(service=service, options=chrome_options)
-        
-        print("✅ Chrome WebDriver initialized successfully")
-        return driver
+            print("✅ Chrome WebDriver initialized successfully")
+            return driver
         
     except WebDriverException as e:
         print(f"❌ Chrome WebDriver error: {e}")
-        print("💡 Trying fallback methods...")
-        
-        # Fallback 1: Try without webdriver-manager (works for both CI and local)
-        try:
-            print("🔄 Fallback 1: Trying system ChromeDriver...")
-            driver = webdriver.Chrome(options=chrome_options)
-            print("✅ Fallback 1: Success!")
-            return driver
-        except Exception as e2:
-            print(f"❌ Fallback 1 failed: {e2}")
-        
-        # Fallback 2: Try webdriver-manager (local only)
-        if not is_ci:
-            try:
-                print("🔄 Fallback 2: Trying webdriver-manager...")
-                service = Service(ChromeDriverManager().install())
-                driver = webdriver.Chrome(service=service, options=chrome_options)
-                print("✅ Fallback 2: Success!")
-                return driver
-            except Exception as e3:
-                print(f"❌ Fallback 2 failed: {e3}")
-        
-        print("❌ All methods failed")
-        print("💡 Final troubleshooting steps:")
-        print("   - Make sure Chrome/Chromium is installed")
-        print("   - Install dependencies: pip install selenium")
-        print("   - For local dev: pip install webdriver-manager")
-        print("   - Check if you're in a headless environment (CI)")
-        
         return None
 
 def clean_organization_name(name):
@@ -360,7 +304,6 @@ def scrape_psu_organizations():
         return []
     
     organizations = []
-    user_data_dir = None
     
     try:
         print(f"🌐 Loading page: {url}")
@@ -368,11 +311,11 @@ def scrape_psu_organizations():
         
         # Wait for the page to load
         print("⏳ Waiting for page to load...")
-        time.sleep(5)  # Increased wait time
+        time.sleep(5)
         
         # Wait for initial organizations to load
         try:
-            wait = WebDriverWait(driver, 20)  # Increased timeout
+            wait = WebDriverWait(driver, 20)
             wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "a[href*='/organization/']")))
             print("✅ Initial organizations loaded")
         except TimeoutException:
@@ -403,8 +346,8 @@ def scrape_psu_organizations():
         
         # Click "Load More" button repeatedly until all organizations are loaded
         click_count = 0
-        max_clicks = 150  # Increased safety limit
-        consecutive_no_change = 0  # Track consecutive clicks with no new content
+        max_clicks = 150
+        consecutive_no_change = 0
         
         while click_count < max_clicks:
             # Count current organizations
@@ -413,7 +356,7 @@ def scrape_psu_organizations():
             
             print(f"📊 Currently loaded: {current_count} organizations")
             
-            # Look for "Load More" button with more comprehensive selectors
+            # Look for "Load More" button
             load_more_selectors = [
                 "//button[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'load more')]",
                 "//span[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'load more')]/ancestor::button",
@@ -427,10 +370,8 @@ def scrape_psu_organizations():
             for selector in load_more_selectors:
                 try:
                     if selector.startswith('//'):
-                        # XPath selector
                         button = driver.find_element(By.XPATH, selector)
                     else:
-                        # CSS selector
                         button = driver.find_element(By.CSS_SELECTOR, selector)
                     
                     if button.is_displayed() and button.is_enabled():
@@ -455,12 +396,12 @@ def scrape_psu_organizations():
                     click_count += 1
                     print(f"🔄 Clicked 'Load More' button #{click_count}")
                     
-                    # Wait for new content to load with progressive waiting
+                    # Wait for new content to load
                     time.sleep(3)
                     
                     # Wait for network activity to settle
                     wait_count = 0
-                    while wait_count < 10:  # Wait up to 10 seconds for new content
+                    while wait_count < 10:
                         time.sleep(1)
                         new_org_elements = driver.find_elements(By.CSS_SELECTOR, "a[href*='/organization/']")
                         new_count = len(new_org_elements)
@@ -487,12 +428,10 @@ def scrape_psu_organizations():
                             print(f"✅ No more organizations to load after {consecutive_no_change} attempts. Final count: {final_count}")
                             break
                         
-                        # Wait longer before trying again
                         time.sleep(5)
                     
                 except Exception as e:
                     print(f"⚠️  Error clicking load more button: {e}")
-                    # Try to continue anyway
                     consecutive_no_change += 1
                     if consecutive_no_change >= 3:
                         break
@@ -516,7 +455,7 @@ def scrape_psu_organizations():
             try:
                 org_data = {}
                 
-                # Extract organization name with improved selectors
+                # Extract organization name
                 name_selectors = [
                     "div[style*='font-weight: 600'][style*='color: rgb(73, 73, 73)']",
                     "div[style*='font-weight: 600']",
@@ -531,10 +470,9 @@ def scrape_psu_organizations():
                         name_elem = element.find_element(By.CSS_SELECTOR, name_selector)
                         potential_name = name_elem.text.strip()
                         
-                        # Make sure we get a reasonable name
                         if potential_name and len(potential_name) < 200 and '\n' not in potential_name:
-                            name = clean_organization_name(potential_name)  # Apply cleaning
-                            if name:  # Only break if we got a valid cleaned name
+                            name = clean_organization_name(potential_name)
+                            if name:
                                 break
                     except:
                         continue
@@ -548,11 +486,10 @@ def scrape_psu_organizations():
                 
                 if name:
                     org_data['name'] = name
-                    org_data['acronyms'] = []  # Empty acronyms array as requested
-                    
+                    org_data['acronyms'] = []
                     organizations.append(org_data)
                 
-                # Enhanced progress indicator
+                # Progress indicator
                 if (i + 1) % 50 == 0:
                     print(f"📊 Processed {i + 1}/{len(org_elements)} organizations...")
                     
@@ -578,15 +515,6 @@ def scrape_psu_organizations():
                     print(f"🧹 Cleaned up user data directory: {setup_driver.user_data_dir}")
             except Exception as cleanup_error:
                 print(f"⚠️ Could not cleanup user data directory: {cleanup_error}")
-        
-        # Also cleanup simple user data directory if it exists
-        if hasattr(setup_driver, 'simple_user_data_dir') and setup_driver.simple_user_data_dir:
-            try:
-                if os.path.exists(setup_driver.simple_user_data_dir):
-                    shutil.rmtree(setup_driver.simple_user_data_dir)
-                    print(f"🧹 Cleaned up simple user data directory: {setup_driver.simple_user_data_dir}")
-            except Exception as cleanup_error:
-                print(f"⚠️ Could not cleanup simple user data directory: {cleanup_error}")
     
     return organizations
 
@@ -622,15 +550,6 @@ def main():
         print(f"   Total organizations: {len(organizations)}")
         print(f"   All organizations have empty acronyms arrays")
         
-        # Show some example cleaned names
-        print(f"\n🧹 Example of name cleaning:")
-        sample_orgs = organizations[:5]
-        for org in sample_orgs:
-            original_name = org['name'] + " at University Park"  # Simulate original
-            print(f"   Original: '{original_name}'")
-            print(f"   Cleaned:  '{org['name']}'")
-            print()
-            
     else:
         print("\n❌ No organizations were found.")
         print("💡 Troubleshooting steps:")
