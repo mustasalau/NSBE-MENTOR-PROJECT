@@ -34,6 +34,8 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -r Scraper/requirements.txt
+          # Install webdriver-manager for local development fallback only
+          pip install webdriver-manager
           
       - name: 🔧 Install Node.js dependencies
         run: npm install
@@ -43,9 +45,21 @@ jobs:
         with:
           chrome-version: stable
           
+      - name: 🔧 Setup ChromeDriver
+        uses: browser-actions/setup-chromedriver@v1
+        with:
+          chromedriver-version: 'latest'
+          
       - name: 🧪 Test clubs scraper and merge
         run: |
           echo "🧪 Testing clubs scraper..."
+          echo "🔍 Environment info:"
+          echo "  Chrome version: $(google-chrome --version 2>/dev/null || echo 'Not found')"
+          echo "  ChromeDriver version: $(chromedriver --version 2>/dev/null || echo 'Not found')"
+          echo "  ChromeDriver location: $(which chromedriver 2>/dev/null || echo 'Not found')"
+          echo "  CI environment: $CI"
+          echo "  GitHub Actions: $GITHUB_ACTIONS"
+          
           cd Scraper
           timeout 300s python3 scraper.py || echo "⚠️ Clubs scraper test completed"
           

@@ -43,16 +43,50 @@ def setup_driver():
     chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
     
     try:
-        # Use webdriver-manager to automatically handle ChromeDriver
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=chrome_options)
+        if is_ci:
+            # In CI, use the system ChromeDriver (pre-installed by GitHub Actions)
+            print("🤖 Running in CI mode - using system ChromeDriver")
+            driver = webdriver.Chrome(options=chrome_options)
+        else:
+            # Local development - use webdriver-manager for convenience
+            print("💻 Running in local mode - using webdriver-manager")
+            service = Service(ChromeDriverManager().install())
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+        
+        print("✅ Chrome WebDriver initialized successfully")
         return driver
+        
     except WebDriverException as e:
         print(f"❌ Chrome WebDriver error: {e}")
-        print("💡 Troubleshooting steps:")
+        print("💡 Trying fallback methods...")
+        
+        # Fallback 1: Try without webdriver-manager (works for both CI and local)
+        try:
+            print("🔄 Fallback 1: Trying system ChromeDriver...")
+            driver = webdriver.Chrome(options=chrome_options)
+            print("✅ Fallback 1: Success!")
+            return driver
+        except Exception as e2:
+            print(f"❌ Fallback 1 failed: {e2}")
+        
+        # Fallback 2: Try webdriver-manager (local only)
+        if not is_ci:
+            try:
+                print("🔄 Fallback 2: Trying webdriver-manager...")
+                service = Service(ChromeDriverManager().install())
+                driver = webdriver.Chrome(service=service, options=chrome_options)
+                print("✅ Fallback 2: Success!")
+                return driver
+            except Exception as e3:
+                print(f"❌ Fallback 2 failed: {e3}")
+        
+        print("❌ All methods failed")
+        print("💡 Final troubleshooting steps:")
         print("   - Make sure Chrome/Chromium is installed")
-        print("   - Install dependencies: pip install selenium webdriver-manager")
+        print("   - Install dependencies: pip install selenium")
+        print("   - For local dev: pip install webdriver-manager")
         print("   - Check if you're in a headless environment (CI)")
+        
         return None
 
 def clean_organization_name(name):
