@@ -34,8 +34,6 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -r Scraper/requirements.txt
-          # Install webdriver-manager for local development fallback only
-          pip install webdriver-manager
           
       - name: 🔧 Install Node.js dependencies
         run: npm install
@@ -61,6 +59,11 @@ jobs:
           echo "🧪 Testing clubs scraper..."
           echo "🔍 Environment info:"
           echo "  Chrome version: $(google-chrome --version 2>/dev/null || echo 'Not found')"
+          echo "  Chrome locations:"
+          echo "    /opt/google/chrome/google-chrome: $(test -f /opt/google/chrome/google-chrome && echo 'Found' || echo 'Not found')"
+          echo "    /usr/bin/google-chrome: $(test -f /usr/bin/google-chrome && echo 'Found' || echo 'Not found')"
+          echo "    /usr/bin/google-chrome-stable: $(test -f /usr/bin/google-chrome-stable && echo 'Found' || echo 'Not found')"
+          echo "    /usr/bin/chromium-browser: $(test -f /usr/bin/chromium-browser && echo 'Found' || echo 'Not found')"
           echo "  ChromeDriver version: $(chromedriver --version 2>/dev/null || echo 'Not found')"
           echo "  ChromeDriver location: $(which chromedriver 2>/dev/null || echo 'Not found')"
           echo "  CI environment: $CI"

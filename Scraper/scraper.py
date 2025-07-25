@@ -32,6 +32,28 @@ def setup_driver():
         chrome_options.add_argument('--disable-features=TranslateUI')
         chrome_options.add_argument('--disable-ipc-flooding-protection')
         chrome_options.add_argument('--remote-debugging-port=9222')
+        
+        # Set correct Chrome binary path for GitHub Actions
+        # Try multiple common Chrome locations in CI environments
+        chrome_paths = [
+            '/opt/google/chrome/google-chrome',  # browser-actions/setup-chrome
+            '/usr/bin/google-chrome',            # Default location
+            '/usr/bin/google-chrome-stable',     # Alternative name
+            '/usr/bin/chromium-browser',         # Chromium
+            '/snap/bin/chromium'                 # Snap installation
+        ]
+        
+        chrome_binary = None
+        for path in chrome_paths:
+            if os.path.exists(path):
+                chrome_binary = path
+                print(f"🔍 Found Chrome binary at: {chrome_binary}")
+                break
+        
+        if chrome_binary:
+            chrome_options.binary_location = chrome_binary
+        else:
+            print("⚠️ No Chrome binary found at common locations, using default")
     else:
         # Local development - can run with visible browser for debugging
         # chrome_options.add_argument('--headless')  # Uncomment for headless locally

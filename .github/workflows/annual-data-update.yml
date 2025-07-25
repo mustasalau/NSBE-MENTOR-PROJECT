@@ -50,8 +50,6 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -r Scraper/requirements.txt
-          # Install webdriver-manager for local development fallback only
-          pip install webdriver-manager
           
       - name: 🔧 Install Node.js dependencies
         run: npm install
