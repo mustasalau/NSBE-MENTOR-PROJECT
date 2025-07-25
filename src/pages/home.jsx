@@ -88,7 +88,6 @@ const Home = () => {
         >
           {/* Multiple source formats for better compatibility */}
           <source src="/videos/NSBEVid.mov" type="video/quicktime" />
-          <source src="/videos/vid1.mov" type="video/quicktime" />
           {/* Fallback message */}
           Your browser does not support the video tag.
         </video>
