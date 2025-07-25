@@ -1,3 +1,4 @@
 selenium==4.33.0
 openpyxl==3.1.5
-webdriver-manager==4.0.1 
+webdriver-manager==4.0.1
+requests==2.31.0 

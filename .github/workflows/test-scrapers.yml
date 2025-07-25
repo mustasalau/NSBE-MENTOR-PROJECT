@@ -38,40 +38,52 @@ jobs:
       - name: 🔧 Install Node.js dependencies
         run: npm install
           
-      - name: 🌐 Install Chrome for Selenium
-        uses: browser-actions/setup-chrome@v1
-        with:
-          chrome-version: stable
-          
-      - name: 🔧 Setup ChromeDriver  
+      - name: 🌐 Install browsers for Selenium
         run: |
-          # Install ChromeDriver using apt (simpler and more reliable)
+          # Install Chrome/Chromium
           sudo apt-get update
-          sudo apt-get install -y chromium-chromedriver
+          sudo apt-get install -y chromium-browser chromium-chromedriver
           
+          # Install Firefox
+          sudo apt-get install -y firefox firefox-geckodriver
+          
+          echo "✅ Browser installation complete"
+          
+      - name: 🔧 Setup WebDrivers  
+        run: |
           # Create symlinks for chromedriver access
           sudo ln -sf /usr/lib/chromium-browser/chromedriver /usr/local/bin/chromedriver || true
           sudo ln -sf /usr/lib/chromium-browser/chromedriver /usr/bin/chromedriver || true
           
-          # Make sure chromedriver is executable
-          sudo chmod +x /usr/lib/chromium-browser/chromedriver || true
+          # Create symlinks for geckodriver access  
+          sudo ln -sf /usr/bin/geckodriver /usr/local/bin/geckodriver || true
           
-          echo "✅ ChromeDriver setup complete"
+          # Make sure drivers are executable
+          sudo chmod +x /usr/lib/chromium-browser/chromedriver || true
+          sudo chmod +x /usr/bin/geckodriver || true
+          
+          echo "✅ WebDriver setup complete"
           
       - name: 🧪 Test clubs scraper and merge
         run: |
           echo "🧪 Testing clubs scraper..."
           echo "🔍 Environment info:"
-          echo "  Chrome version: $(google-chrome --version 2>/dev/null || echo 'Not found')"
+          echo "  Chrome version: $(google-chrome --version 2>/dev/null || chromium-browser --version 2>/dev/null || echo 'Not found')"
+          echo "  Firefox version: $(firefox --version 2>/dev/null || echo 'Not found')"
           echo "  Chrome/Chromium locations:"
           echo "    /snap/bin/chromium: $(test -f /snap/bin/chromium && echo 'Found' || echo 'Not found')"
           echo "    /usr/bin/chromium-browser: $(test -f /usr/bin/chromium-browser && echo 'Found' || echo 'Not found')"
           echo "    /opt/google/chrome/google-chrome: $(test -f /opt/google/chrome/google-chrome && echo 'Found' || echo 'Not found')"
           echo "    /usr/bin/google-chrome: $(test -f /usr/bin/google-chrome && echo 'Found' || echo 'Not found')"
           echo "    /usr/bin/google-chrome-stable: $(test -f /usr/bin/google-chrome-stable && echo 'Found' || echo 'Not found')"
-          echo "  Snap packages: $(snap list | grep -E '(chrome|chromium)' || echo 'None found')"
+          echo "  Firefox locations:"
+          echo "    /usr/bin/firefox: $(test -f /usr/bin/firefox && echo 'Found' || echo 'Not found')"
+          echo "    /usr/bin/firefox-esr: $(test -f /usr/bin/firefox-esr && echo 'Found' || echo 'Not found')"
+          echo "    /snap/bin/firefox: $(test -f /snap/bin/firefox && echo 'Found' || echo 'Not found')"
           echo "  ChromeDriver version: $(chromedriver --version 2>/dev/null || echo 'Not found')"
           echo "  ChromeDriver location: $(which chromedriver 2>/dev/null || echo 'Not found')"
+          echo "  GeckoDriver version: $(geckodriver --version 2>/dev/null || echo 'Not found')"
+          echo "  GeckoDriver location: $(which geckodriver 2>/dev/null || echo 'Not found')"
           echo "  CI environment: $CI"
           echo "  GitHub Actions: $GITHUB_ACTIONS"
           echo "  Temp directories:"
