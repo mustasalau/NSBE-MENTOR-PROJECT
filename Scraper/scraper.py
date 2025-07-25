@@ -55,7 +55,7 @@ def setup_driver():
     is_ci = os.environ.get('CI') or os.environ.get('GITHUB_ACTIONS')
     
     if is_ci:
-        print("🤖 Running in CI mode - using minimal Chrome configuration")
+        print("🤖 Running in CI mode - using stateless Chrome configuration")
         
         # Clean up any existing Chrome processes first
         cleanup_chrome_processes()
@@ -79,23 +79,23 @@ def setup_driver():
                 print(f"🔍 Found Chrome binary: {chrome_binary}")
                 break
         
-        # Try multiple approaches in order of preference
+        # Try multiple stateless approaches
         approaches = [
             {
-                'name': 'Remote debugging approach',
-                'method': 'remote_debug'
+                'name': 'Stateless incognito mode',
+                'method': 'stateless_incognito'
             },
             {
-                'name': 'Force new session with cleanup',
-                'method': 'force_new'
+                'name': 'Memory-only Chrome',
+                'method': 'memory_only'
             },
             {
-                'name': 'Minimal Chromium snap',
-                'method': 'snap_minimal'
+                'name': 'Single process mode',
+                'method': 'single_process'
             },
             {
-                'name': 'Emergency fallback',
-                'method': 'emergency'
+                'name': 'Ultra minimal',
+                'method': 'ultra_minimal'
             }
         ]
         
@@ -105,73 +105,69 @@ def setup_driver():
                 
                 chrome_options = Options()
                 
-                if approach['method'] == 'remote_debug':
-                    # Use remote debugging approach - no user data dir needed
-                    chrome_options.add_argument('--headless=new')
-                    chrome_options.add_argument('--no-sandbox')
-                    chrome_options.add_argument('--disable-dev-shm-usage')
-                    chrome_options.add_argument('--disable-gpu')
-                    chrome_options.add_argument('--remote-debugging-port=0')  # Let Chrome pick a port
+                # Base options for all approaches
+                chrome_options.add_argument('--headless=new')
+                chrome_options.add_argument('--no-sandbox')
+                chrome_options.add_argument('--disable-dev-shm-usage')
+                chrome_options.add_argument('--disable-gpu')
+                chrome_options.add_argument('--window-size=1920,1080')
+                
+                if approach['method'] == 'stateless_incognito':
+                    # Completely stateless approach - no user data directory at all
+                    chrome_options.add_argument('--incognito')
                     chrome_options.add_argument('--no-first-run')
-                    chrome_options.add_argument('--disable-default-apps')
+                    chrome_options.add_argument('--no-default-browser-check')
                     chrome_options.add_argument('--disable-extensions')
                     chrome_options.add_argument('--disable-plugins')
                     chrome_options.add_argument('--disable-sync')
                     chrome_options.add_argument('--disable-translate')
                     chrome_options.add_argument('--disable-background-networking')
-                    chrome_options.add_argument('--window-size=1920,1080')
-                    chrome_options.add_argument('--virtual-time-budget=25000')
-                    # Explicitly avoid user data directory
-                    chrome_options.add_argument('--disable-background-mode')
-                    chrome_options.add_argument('--disable-restore-session-state')
-                    chrome_options.add_argument('--disable-session-crashed-bubble')
-                    
-                elif approach['method'] == 'force_new':
-                    # Force a completely new session
-                    chrome_options.add_argument('--headless=new')
-                    chrome_options.add_argument('--no-sandbox')
-                    chrome_options.add_argument('--disable-dev-shm-usage')
-                    chrome_options.add_argument('--disable-gpu')
-                    chrome_options.add_argument('--no-first-run')
-                    chrome_options.add_argument('--disable-default-apps')
-                    chrome_options.add_argument('--disable-extensions')
-                    chrome_options.add_argument('--disable-sync')
-                    chrome_options.add_argument('--window-size=1920,1080')
-                    chrome_options.add_argument('--force-first-run')
-                    chrome_options.add_argument('--no-default-browser-check')
-                    chrome_options.add_argument('--disable-background-mode')
-                    chrome_options.add_argument('--disable-restore-session-state')
-                    chrome_options.add_argument('--disable-session-crashed-bubble')
-                    chrome_options.add_argument('--disable-features=TranslateUI,BlinkGenPropertyTrees')
-                    
-                    # Create a truly unique temp directory
-                    random_id = f"{int(time.time())}_{os.getpid()}_{random.randint(10000, 99999)}"
-                    temp_dir = f"/tmp/chrome_force_{random_id}"
-                    
-                    # Ensure directory doesn't exist
-                    if os.path.exists(temp_dir):
-                        shutil.rmtree(temp_dir)
-                    
-                    os.makedirs(temp_dir, mode=0o755)
-                    chrome_options.add_argument(f'--user-data-dir={temp_dir}')
-                    print(f"🗂️ Force new session with: {temp_dir}")
-                    
-                elif approach['method'] == 'snap_minimal':
-                    # Try minimal approach specifically for snap chromium
-                    chrome_options.add_argument('--headless')
-                    chrome_options.add_argument('--no-sandbox')
-                    chrome_options.add_argument('--disable-dev-shm-usage')
-                    chrome_options.add_argument('--disable-gpu')
-                    chrome_options.add_argument('--disable-software-rasterizer')
+                    chrome_options.add_argument('--disable-background-timer-throttling')
+                    chrome_options.add_argument('--disable-backgrounding-occluded-windows')
+                    chrome_options.add_argument('--disable-renderer-backgrounding')
+                    chrome_options.add_argument('--disable-features=TranslateUI')
+                    chrome_options.add_argument('--disable-ipc-flooding-protection')
+                    chrome_options.add_argument('--remote-debugging-port=0')
+                    chrome_options.add_argument('--disable-web-security')
                     chrome_options.add_argument('--disable-features=VizDisplayCompositor')
-                    chrome_options.add_argument('--window-size=1920,1080')
-                    chrome_options.add_argument('--single-process')
+                    chrome_options.add_argument('--disable-logging')
+                    chrome_options.add_argument('--silent')
+                    # Explicitly avoid any user data directory
+                    chrome_options.add_argument('--disable-session-crashed-bubble')
+                    chrome_options.add_argument('--disable-restore-session-state')
+                    chrome_options.add_argument('--disable-background-mode')
                     
-                elif approach['method'] == 'emergency':
-                    # Emergency minimal settings
-                    chrome_options.add_argument('--headless')
-                    chrome_options.add_argument('--no-sandbox')
-                    chrome_options.add_argument('--window-size=1920,1080')
+                elif approach['method'] == 'memory_only':
+                    # Use memory-only temporary directory
+                    chrome_options.add_argument('--incognito')
+                    chrome_options.add_argument('--no-first-run')
+                    chrome_options.add_argument('--disable-extensions')
+                    chrome_options.add_argument('--disable-plugins')
+                    chrome_options.add_argument('--disable-sync')
+                    chrome_options.add_argument('--single-process')
+                    chrome_options.add_argument('--disable-web-security')
+                    chrome_options.add_argument('--remote-debugging-port=0')
+                    # Use a memory-based temp directory
+                    memory_dir = f"/dev/shm/chrome_temp_{os.getpid()}_{int(time.time())}"
+                    chrome_options.add_argument(f'--user-data-dir={memory_dir}')
+                    
+                elif approach['method'] == 'single_process':
+                    # Single process with minimal options
+                    chrome_options.add_argument('--single-process')
+                    chrome_options.add_argument('--no-zygote')
+                    chrome_options.add_argument('--no-first-run')
+                    chrome_options.add_argument('--disable-extensions')
+                    chrome_options.add_argument('--disable-plugins')
+                    chrome_options.add_argument('--disable-sync')
+                    chrome_options.add_argument('--incognito')
+                    chrome_options.add_argument('--remote-debugging-port=0')
+                    
+                elif approach['method'] == 'ultra_minimal':
+                    # Absolute minimal configuration
+                    chrome_options.add_argument('--incognito')
+                    chrome_options.add_argument('--no-first-run')
+                    chrome_options.add_argument('--disable-extensions')
+                    chrome_options.add_argument('--remote-debugging-port=0')
                 
                 # Set Chrome binary if found
                 if chrome_binary:
@@ -183,20 +179,15 @@ def setup_driver():
                 # Try to create the driver
                 driver = webdriver.Chrome(options=chrome_options)
                 print(f"✅ Chrome WebDriver initialized successfully with approach {i}")
-                
-                # Store temp directory for cleanup if it was created
-                if approach['method'] == 'force_new' and 'temp_dir' in locals():
-                    setup_driver.temp_dir = temp_dir
-                
                 return driver
                 
             except Exception as e:
                 print(f"❌ Attempt {i} failed: {e}")
                 
-                # Cleanup temp directory if it was created
-                if approach['method'] == 'force_new' and 'temp_dir' in locals() and os.path.exists(temp_dir):
+                # Cleanup memory directory if it was created
+                if approach['method'] == 'memory_only' and 'memory_dir' in locals() and os.path.exists(memory_dir):
                     try:
-                        shutil.rmtree(temp_dir)
+                        shutil.rmtree(memory_dir)
                     except:
                         pass
                 

@@ -4,6 +4,8 @@ import os
 import tempfile
 import uuid
 import shutil
+import random
+import glob
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -13,247 +15,206 @@ from selenium.webdriver.chrome.service import Service
 from selenium.common.exceptions import TimeoutException, WebDriverException
 from webdriver_manager.chrome import ChromeDriverManager
 
+def cleanup_chrome_processes():
+    """Kill any existing Chrome processes that might be interfering."""
+    try:
+        import subprocess
+        # Kill any existing Chrome/Chromium processes
+        for process_name in ['chrome', 'chromium', 'chromium-browser']:
+            try:
+                subprocess.run(['pkill', '-f', process_name], 
+                             capture_output=True, timeout=10)
+            except:
+                pass
+        
+        # Also try to clean up any lock files
+        lock_patterns = [
+            '/tmp/.com.google.Chrome.*',
+            '/tmp/.org.chromium.Chromium.*',
+            '/tmp/chrome_*',
+            '/dev/shm/chrome_*'
+        ]
+        
+        for pattern in lock_patterns:
+            for lock_file in glob.glob(pattern):
+                try:
+                    if os.path.isfile(lock_file):
+                        os.remove(lock_file)
+                    elif os.path.isdir(lock_file):
+                        shutil.rmtree(lock_file)
+                except:
+                    pass
+        
+        print("🧹 Cleaned up any existing Chrome processes and lock files")
+    except:
+        pass
+
 def setup_driver():
     """Set up Chrome WebDriver with appropriate options."""
-    chrome_options = Options()
-    
     # Detect if running in CI environment
     is_ci = os.environ.get('CI') or os.environ.get('GITHUB_ACTIONS')
     
-    # Debug: Check for existing Chrome processes
     if is_ci:
-        import subprocess
-        try:
-            result = subprocess.run(['pgrep', '-f', 'chrome'], capture_output=True, text=True)
-            if result.stdout.strip():
-                print(f"🔍 Found existing Chrome processes: {result.stdout.strip()}")
-            else:
-                print("🔍 No existing Chrome processes found")
-        except:
-            print("🔍 Could not check for existing Chrome processes")
-    
-    # Add options for better compatibility
-    if is_ci:
-        # CI environment - must run headless with additional options
-        chrome_options.add_argument('--headless')
-        chrome_options.add_argument('--no-sandbox')
-        chrome_options.add_argument('--disable-dev-shm-usage')
-        chrome_options.add_argument('--disable-gpu')
-        chrome_options.add_argument('--disable-extensions')
-        chrome_options.add_argument('--disable-background-timer-throttling')
-        chrome_options.add_argument('--disable-backgrounding-occluded-windows')
-        chrome_options.add_argument('--disable-renderer-backgrounding')
-        chrome_options.add_argument('--disable-features=TranslateUI')
-        chrome_options.add_argument('--disable-ipc-flooding-protection')
-        chrome_options.add_argument('--remote-debugging-port=0')  # Use random port to avoid conflicts
-        chrome_options.add_argument('--single-process')  # Run in single process mode
-        chrome_options.add_argument('--disable-sync')  # Disable Chrome sync
-        chrome_options.add_argument('--disable-default-apps')  # Disable default apps
-        chrome_options.add_argument('--disable-web-security')  # Disable web security (for testing)
-        chrome_options.add_argument('--disable-features=VizDisplayCompositor')  # Disable compositor
+        print("🤖 Running in CI mode - using stateless Chrome configuration")
         
-        # Set correct Chrome binary path for GitHub Actions
-        # Try multiple common Chrome/Chromium locations in CI environments
+        # Clean up any existing Chrome processes first
+        cleanup_chrome_processes()
+        
+        # Wait a moment for cleanup to complete
+        time.sleep(2)
+        
+        # Find Chrome binary
         chrome_paths = [
-            '/snap/bin/chromium',                # Snap installation (most common in Ubuntu CI)
-            '/usr/bin/chromium-browser',         # Apt chromium-browser package
-            '/opt/google/chrome/google-chrome',  # browser-actions/setup-chrome
-            '/usr/bin/google-chrome',            # Default Chrome location
-            '/usr/bin/google-chrome-stable',     # Alternative Chrome name
+            '/snap/bin/chromium',
+            '/usr/bin/chromium-browser',
+            '/opt/google/chrome/google-chrome',
+            '/usr/bin/google-chrome',
+            '/usr/bin/google-chrome-stable',
         ]
         
         chrome_binary = None
         for path in chrome_paths:
             if os.path.exists(path) and os.access(path, os.X_OK):
                 chrome_binary = path
-                print(f"🔍 Found working Chrome/Chromium binary at: {chrome_binary}")
+                print(f"🔍 Found Chrome binary: {chrome_binary}")
                 break
         
-        if chrome_binary:
-            chrome_options.binary_location = chrome_binary
-            print(f"✅ Using Chrome/Chromium binary: {chrome_binary}")
-        else:
-            print("⚠️ No Chrome/Chromium binary found, trying without explicit path")
+        # Try multiple stateless approaches
+        approaches = [
+            {
+                'name': 'Stateless incognito mode',
+                'method': 'stateless_incognito'
+            },
+            {
+                'name': 'Memory-only Chrome',
+                'method': 'memory_only'
+            },
+            {
+                'name': 'Single process mode',
+                'method': 'single_process'
+            },
+            {
+                'name': 'Ultra minimal',
+                'method': 'ultra_minimal'
+            }
+        ]
+        
+        for i, approach in enumerate(approaches, 1):
+            try:
+                print(f"🔄 Attempt {i}: {approach['name']}")
+                
+                chrome_options = Options()
+                
+                # Base options for all approaches
+                chrome_options.add_argument('--headless=new')
+                chrome_options.add_argument('--no-sandbox')
+                chrome_options.add_argument('--disable-dev-shm-usage')
+                chrome_options.add_argument('--disable-gpu')
+                chrome_options.add_argument('--window-size=1920,1080')
+                
+                if approach['method'] == 'stateless_incognito':
+                    # Completely stateless approach - no user data directory at all
+                    chrome_options.add_argument('--incognito')
+                    chrome_options.add_argument('--no-first-run')
+                    chrome_options.add_argument('--no-default-browser-check')
+                    chrome_options.add_argument('--disable-extensions')
+                    chrome_options.add_argument('--disable-plugins')
+                    chrome_options.add_argument('--disable-sync')
+                    chrome_options.add_argument('--disable-translate')
+                    chrome_options.add_argument('--disable-background-networking')
+                    chrome_options.add_argument('--disable-background-timer-throttling')
+                    chrome_options.add_argument('--disable-backgrounding-occluded-windows')
+                    chrome_options.add_argument('--disable-renderer-backgrounding')
+                    chrome_options.add_argument('--disable-features=TranslateUI')
+                    chrome_options.add_argument('--disable-ipc-flooding-protection')
+                    chrome_options.add_argument('--remote-debugging-port=0')
+                    chrome_options.add_argument('--disable-web-security')
+                    chrome_options.add_argument('--disable-features=VizDisplayCompositor')
+                    chrome_options.add_argument('--disable-logging')
+                    chrome_options.add_argument('--silent')
+                    # Explicitly avoid any user data directory
+                    chrome_options.add_argument('--disable-session-crashed-bubble')
+                    chrome_options.add_argument('--disable-restore-session-state')
+                    chrome_options.add_argument('--disable-background-mode')
+                    
+                elif approach['method'] == 'memory_only':
+                    # Use memory-only temporary directory
+                    chrome_options.add_argument('--incognito')
+                    chrome_options.add_argument('--no-first-run')
+                    chrome_options.add_argument('--disable-extensions')
+                    chrome_options.add_argument('--disable-plugins')
+                    chrome_options.add_argument('--disable-sync')
+                    chrome_options.add_argument('--single-process')
+                    chrome_options.add_argument('--disable-web-security')
+                    chrome_options.add_argument('--remote-debugging-port=0')
+                    # Use a memory-based temp directory
+                    memory_dir = f"/dev/shm/chrome_temp_{os.getpid()}_{int(time.time())}"
+                    chrome_options.add_argument(f'--user-data-dir={memory_dir}')
+                    
+                elif approach['method'] == 'single_process':
+                    # Single process with minimal options
+                    chrome_options.add_argument('--single-process')
+                    chrome_options.add_argument('--no-zygote')
+                    chrome_options.add_argument('--no-first-run')
+                    chrome_options.add_argument('--disable-extensions')
+                    chrome_options.add_argument('--disable-plugins')
+                    chrome_options.add_argument('--disable-sync')
+                    chrome_options.add_argument('--incognito')
+                    chrome_options.add_argument('--remote-debugging-port=0')
+                    
+                elif approach['method'] == 'ultra_minimal':
+                    # Absolute minimal configuration
+                    chrome_options.add_argument('--incognito')
+                    chrome_options.add_argument('--no-first-run')
+                    chrome_options.add_argument('--disable-extensions')
+                    chrome_options.add_argument('--remote-debugging-port=0')
+                
+                # Set Chrome binary if found
+                if chrome_binary:
+                    chrome_options.binary_location = chrome_binary
+                
+                # Set user agent
+                chrome_options.add_argument('--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+                
+                # Try to create the driver
+                driver = webdriver.Chrome(options=chrome_options)
+                print(f"✅ Chrome WebDriver initialized successfully with approach {i}")
+                return driver
+                
+            except Exception as e:
+                print(f"❌ Attempt {i} failed: {e}")
+                
+                # Cleanup memory directory if it was created
+                if approach['method'] == 'memory_only' and 'memory_dir' in locals() and os.path.exists(memory_dir):
+                    try:
+                        shutil.rmtree(memory_dir)
+                    except:
+                        pass
+                
+                # Wait between attempts
+                time.sleep(1)
+                continue
+        
+        print("❌ All approaches failed")
+        return None
+    
     else:
-        # Local development - can run with visible browser for debugging
-        chrome_options.add_argument('--headless')  # Comment out to see browser locally
+        # Local development
+        print("💻 Running in local mode")
+        chrome_options = Options()
         chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument('--disable-dev-shm-usage')
         chrome_options.add_argument('--disable-gpu')
-    
-    chrome_options.add_argument('--window-size=1920,1080')
-    chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
-    
-    # Add unique user data directory to avoid conflicts with other Chrome instances
-    # Try using /dev/shm for better performance in CI, fallback to temp dir
-    if is_ci and os.path.exists('/dev/shm'):
-        temp_dir = '/dev/shm'
-        print("🔍 Using /dev/shm for user data directory")
-    else:
-        temp_dir = tempfile.gettempdir()
-        print(f"🔍 Using temp directory: {temp_dir}")
-    
-    unique_id = str(uuid.uuid4())[:8]
-    timestamp = str(int(time.time()))
-    user_data_dir = os.path.join(temp_dir, f'chrome_majors_scraper_{unique_id}_{timestamp}')
-    
-    # Ensure the directory doesn't exist and create it
-    if os.path.exists(user_data_dir):
-        print(f"⚠️ Directory already exists, removing: {user_data_dir}")
-        shutil.rmtree(user_data_dir, ignore_errors=True)
-    
-    os.makedirs(user_data_dir, exist_ok=True)
-    
-    # Create the required profile directory structure
-    default_profile_dir = os.path.join(user_data_dir, 'Default')
-    os.makedirs(default_profile_dir, exist_ok=True)
-    
-    # Set proper permissions (more permissive to allow Chrome to write files)
-    os.chmod(user_data_dir, 0o777)
-    os.chmod(default_profile_dir, 0o777)
-    
-    # Create a basic preferences file to prevent Chrome from trying to write it
-    prefs_file = os.path.join(default_profile_dir, 'Preferences')
-    try:
-        with open(prefs_file, 'w') as f:
-            f.write('{}')  # Empty JSON object
-        os.chmod(prefs_file, 0o666)
-        print(f"🗂️ Created preferences file: {prefs_file}")
-    except Exception as pref_error:
-        print(f"⚠️ Could not create preferences file: {pref_error}")
-    
-    # Create other necessary Chrome files
-    try:
-        # Create Local State file
-        local_state_file = os.path.join(user_data_dir, 'Local State')
-        with open(local_state_file, 'w') as f:
-            f.write('{}')
-        os.chmod(local_state_file, 0o666)
-        print(f"🗂️ Created local state file: {local_state_file}")
-    except Exception as state_error:
-        print(f"⚠️ Could not create local state file: {state_error}")
-    
-    print(f"🗂️ Created unique user data directory: {user_data_dir}")
-    print(f"🗂️ Created profile directory: {default_profile_dir}")
-    print(f"🔍 Directory exists: {os.path.exists(user_data_dir)}")
-    print(f"🔍 Directory writable: {os.access(user_data_dir, os.W_OK)}")
-    
-    chrome_options.add_argument(f'--user-data-dir={user_data_dir}')
-    chrome_options.add_argument(f'--profile-directory=Default')
-    
-    # Store user_data_dir for cleanup
-    setup_driver.user_data_dir = user_data_dir
-    
-    try:
-        if is_ci:
-            # In CI, use the system ChromeDriver (pre-installed by GitHub Actions)
-            print("🤖 Running in CI mode - using system ChromeDriver")
-            
-            # First, try with a simple unique user data directory
-            try:
-                print("🔄 Attempt 1: Minimal Chrome settings with unique user data dir")
-                temp_options = Options()
-                temp_options.add_argument('--headless')
-                temp_options.add_argument('--no-sandbox')
-                temp_options.add_argument('--disable-dev-shm-usage')
-                temp_options.add_argument('--disable-gpu')
-                temp_options.add_argument('--incognito')  # Run in incognito mode
-                temp_options.add_argument('--disable-extensions')  # Disable all extensions
-                temp_options.add_argument('--disable-plugins')  # Disable plugins
-                temp_options.add_argument('--disable-images')  # Speed up loading
-                
-                # Always use a unique user data directory, even for minimal setup
-                simple_user_dir = f'/dev/shm/chrome_majors_simple_{unique_id}_{timestamp}'
-                os.makedirs(simple_user_dir, exist_ok=True)
-                
-                # Create the required profile directory structure
-                default_profile_dir = os.path.join(simple_user_dir, 'Default')
-                os.makedirs(default_profile_dir, exist_ok=True)
-                
-                # Set proper permissions (more permissive to allow Chrome to write files)
-                os.chmod(simple_user_dir, 0o777)
-                os.chmod(default_profile_dir, 0o777)
-                
-                # Create a basic preferences file to prevent Chrome from trying to write it
-                prefs_file = os.path.join(default_profile_dir, 'Preferences')
-                try:
-                    with open(prefs_file, 'w') as f:
-                        f.write('{}')  # Empty JSON object
-                    os.chmod(prefs_file, 0o666)
-                    print(f"🗂️ Created preferences file: {prefs_file}")
-                except Exception as pref_error:
-                    print(f"⚠️ Could not create preferences file: {pref_error}")
-                
-                # Create other necessary Chrome files
-                try:
-                    # Create Local State file
-                    local_state_file = os.path.join(simple_user_dir, 'Local State')
-                    with open(local_state_file, 'w') as f:
-                        f.write('{}')
-                    os.chmod(local_state_file, 0o666)
-                    print(f"🗂️ Created local state file: {local_state_file}")
-                except Exception as state_error:
-                    print(f"⚠️ Could not create local state file: {state_error}")
-                
-                temp_options.add_argument(f'--user-data-dir={simple_user_dir}')
-                temp_options.add_argument(f'--profile-directory=Default')
-                print(f"🗂️ Using simple user data directory: {simple_user_dir}")
-                print(f"🗂️ Created profile directory: {default_profile_dir}")
-                
-                if chrome_binary:
-                    temp_options.binary_location = chrome_binary
-                
-                driver = webdriver.Chrome(options=temp_options)
-                print("✅ Chrome WebDriver initialized successfully (minimal settings)")
-                
-                # Store for cleanup
-                setup_driver.simple_user_data_dir = simple_user_dir
-                return driver
-            except Exception as e1:
-                print(f"❌ Attempt 1 failed: {e1}")
-                print("🔄 Attempt 2: With full Chrome options")
-                driver = webdriver.Chrome(options=chrome_options)
-        else:
-            # Local development - use webdriver-manager for convenience
-            print("💻 Running in local mode - using webdriver-manager")
+        chrome_options.add_argument('--window-size=1920,1080')
+        
+        try:
             service = Service(ChromeDriverManager().install())
             driver = webdriver.Chrome(service=service, options=chrome_options)
-        
-        print("✅ Chrome WebDriver initialized successfully")
-        return driver
-        
-    except WebDriverException as e:
-        print(f"❌ Chrome WebDriver error: {e}")
-        print("💡 Trying fallback methods...")
-        
-        # Fallback 1: Try without webdriver-manager (works for both CI and local)
-        try:
-            print("🔄 Fallback 1: Trying system ChromeDriver...")
-            driver = webdriver.Chrome(options=chrome_options)
-            print("✅ Fallback 1: Success!")
+            print("✅ Chrome WebDriver initialized successfully")
             return driver
-        except Exception as e2:
-            print(f"❌ Fallback 1 failed: {e2}")
-        
-        # Fallback 2: Try webdriver-manager (local only)
-        if not is_ci:
-            try:
-                print("🔄 Fallback 2: Trying webdriver-manager...")
-                service = Service(ChromeDriverManager().install())
-                driver = webdriver.Chrome(service=service, options=chrome_options)
-                print("✅ Fallback 2: Success!")
-                return driver
-            except Exception as e3:
-                print(f"❌ Fallback 2 failed: {e3}")
-        
-        print("❌ All methods failed")
-        print("💡 Final troubleshooting steps:")
-        print("   - Make sure Chrome/Chromium is installed")
-        print("   - Install dependencies: pip install selenium")
-        print("   - For local dev: pip install webdriver-manager")
-        print("   - Check if you're in a headless environment (CI)")
-        
-        return None
+        except Exception as e:
+            print(f"❌ Error in local mode: {e}")
+            return None
 
 def scrape_penn_state_majors_selenium():
     """
@@ -346,23 +307,8 @@ def scrape_penn_state_majors_selenium():
         print("🔒 Browser closed")
         
         # Cleanup temporary user data directories
-        if hasattr(setup_driver, 'user_data_dir') and setup_driver.user_data_dir:
-            try:
-                if os.path.exists(setup_driver.user_data_dir):
-                    shutil.rmtree(setup_driver.user_data_dir)
-                    print(f"🧹 Cleaned up user data directory: {setup_driver.user_data_dir}")
-            except Exception as cleanup_error:
-                print(f"⚠️ Could not cleanup user data directory: {cleanup_error}")
+        # No user data directories to cleanup in stateless mode
         
-        # Also cleanup simple user data directory if it exists
-        if hasattr(setup_driver, 'simple_user_data_dir') and setup_driver.simple_user_data_dir:
-            try:
-                if os.path.exists(setup_driver.simple_user_data_dir):
-                    shutil.rmtree(setup_driver.simple_user_data_dir)
-                    print(f"🧹 Cleaned up simple user data directory: {setup_driver.simple_user_data_dir}")
-            except Exception as cleanup_error:
-                print(f"⚠️ Could not cleanup simple user data directory: {cleanup_error}")
-    
     return majors
 
 def main():
