@@ -49,8 +49,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y chromium-chromedriver
           
-          # Create symlink if needed
+          # Create symlinks for chromedriver access
           sudo ln -sf /usr/lib/chromium-browser/chromedriver /usr/local/bin/chromedriver || true
+          sudo ln -sf /usr/lib/chromium-browser/chromedriver /usr/bin/chromedriver || true
+          
+          # Make sure chromedriver is executable
+          sudo chmod +x /usr/lib/chromium-browser/chromedriver || true
           
           echo "✅ ChromeDriver setup complete"
           
@@ -59,11 +63,13 @@ jobs:
           echo "🧪 Testing clubs scraper..."
           echo "🔍 Environment info:"
           echo "  Chrome version: $(google-chrome --version 2>/dev/null || echo 'Not found')"
-          echo "  Chrome locations:"
+          echo "  Chrome/Chromium locations:"
+          echo "    /snap/bin/chromium: $(test -f /snap/bin/chromium && echo 'Found' || echo 'Not found')"
+          echo "    /usr/bin/chromium-browser: $(test -f /usr/bin/chromium-browser && echo 'Found' || echo 'Not found')"
           echo "    /opt/google/chrome/google-chrome: $(test -f /opt/google/chrome/google-chrome && echo 'Found' || echo 'Not found')"
           echo "    /usr/bin/google-chrome: $(test -f /usr/bin/google-chrome && echo 'Found' || echo 'Not found')"
           echo "    /usr/bin/google-chrome-stable: $(test -f /usr/bin/google-chrome-stable && echo 'Found' || echo 'Not found')"
-          echo "    /usr/bin/chromium-browser: $(test -f /usr/bin/chromium-browser && echo 'Found' || echo 'Not found')"
+          echo "  Snap packages: $(snap list | grep -E '(chrome|chromium)' || echo 'None found')"
           echo "  ChromeDriver version: $(chromedriver --version 2>/dev/null || echo 'Not found')"
           echo "  ChromeDriver location: $(which chromedriver 2>/dev/null || echo 'Not found')"
           echo "  CI environment: $CI"

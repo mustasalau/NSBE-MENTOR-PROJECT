@@ -33,26 +33,27 @@ def setup_driver():
         chrome_options.add_argument('--remote-debugging-port=9222')
         
         # Set correct Chrome binary path for GitHub Actions
-        # Try multiple common Chrome locations in CI environments
+        # Try multiple common Chrome/Chromium locations in CI environments
         chrome_paths = [
+            '/snap/bin/chromium',                # Snap installation (most common in Ubuntu CI)
+            '/usr/bin/chromium-browser',         # Apt chromium-browser package
             '/opt/google/chrome/google-chrome',  # browser-actions/setup-chrome
-            '/usr/bin/google-chrome',            # Default location
-            '/usr/bin/google-chrome-stable',     # Alternative name
-            '/usr/bin/chromium-browser',         # Chromium
-            '/snap/bin/chromium'                 # Snap installation
+            '/usr/bin/google-chrome',            # Default Chrome location
+            '/usr/bin/google-chrome-stable',     # Alternative Chrome name
         ]
         
         chrome_binary = None
         for path in chrome_paths:
-            if os.path.exists(path):
+            if os.path.exists(path) and os.access(path, os.X_OK):
                 chrome_binary = path
-                print(f"🔍 Found Chrome binary at: {chrome_binary}")
+                print(f"🔍 Found working Chrome/Chromium binary at: {chrome_binary}")
                 break
         
         if chrome_binary:
             chrome_options.binary_location = chrome_binary
+            print(f"✅ Using Chrome/Chromium binary: {chrome_binary}")
         else:
-            print("⚠️ No Chrome binary found at common locations, using default")
+            print("⚠️ No Chrome/Chromium binary found, trying without explicit path")
     else:
         # Local development - can run with visible browser for debugging
         chrome_options.add_argument('--headless')  # Comment out to see browser locally
