@@ -1,6 +1,9 @@
 import json
 import time
 import os
+import tempfile
+import uuid
+import shutil
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -30,7 +33,7 @@ def setup_driver():
         chrome_options.add_argument('--disable-renderer-backgrounding')
         chrome_options.add_argument('--disable-features=TranslateUI')
         chrome_options.add_argument('--disable-ipc-flooding-protection')
-        chrome_options.add_argument('--remote-debugging-port=9222')
+        chrome_options.add_argument('--remote-debugging-port=0')  # Use random port to avoid conflicts
         
         # Set correct Chrome binary path for GitHub Actions
         # Try multiple common Chrome/Chromium locations in CI environments
@@ -63,6 +66,16 @@ def setup_driver():
     
     chrome_options.add_argument('--window-size=1920,1080')
     chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+    
+    # Add unique user data directory to avoid conflicts with other Chrome instances
+    temp_dir = tempfile.gettempdir()
+    unique_id = str(uuid.uuid4())[:8]
+    user_data_dir = os.path.join(temp_dir, f'chrome_majors_scraper_{unique_id}')
+    chrome_options.add_argument(f'--user-data-dir={user_data_dir}')
+    print(f"🗂️ Using unique user data directory: {user_data_dir}")
+    
+    # Store user_data_dir for cleanup
+    setup_driver.user_data_dir = user_data_dir
     
     try:
         if is_ci:
@@ -200,6 +213,15 @@ def scrape_penn_state_majors_selenium():
     finally:
         driver.quit()
         print("🔒 Browser closed")
+        
+        # Cleanup temporary user data directory
+        if hasattr(setup_driver, 'user_data_dir') and setup_driver.user_data_dir:
+            try:
+                if os.path.exists(setup_driver.user_data_dir):
+                    shutil.rmtree(setup_driver.user_data_dir)
+                    print(f"🧹 Cleaned up user data directory: {setup_driver.user_data_dir}")
+            except Exception as cleanup_error:
+                print(f"⚠️ Could not cleanup user data directory: {cleanup_error}")
     
     return majors
 
