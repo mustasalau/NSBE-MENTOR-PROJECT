@@ -79,6 +79,12 @@ jobs:
           
           echo "✅ WebDriver setup complete"
           
+      - name: 🧪 Environment diagnostics
+        run: |
+          echo "🧪 Running environment diagnostics..."
+          cd Scraper
+          python3 test_environment.py
+          
       - name: 🧪 Test clubs scraper and merge
         run: |
           echo "🧪 Testing clubs scraper..."

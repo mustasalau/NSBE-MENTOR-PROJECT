@@ -493,6 +493,153 @@ def scrape_psu_organizations():
 
     return organizations
 
+def debug_environment():
+    """Debug the current environment to understand CI vs local differences."""
+    print("🔍 ENVIRONMENT DEBUG INFORMATION")
+    print("=" * 60)
+    
+    # Operating System Info
+    import platform
+    print(f"🖥️  Operating System: {platform.system()} {platform.release()}")
+    print(f"🖥️  Platform: {platform.platform()}")
+    print(f"🖥️  Python Version: {platform.python_version()}")
+    
+    # Environment Variables
+    import os
+    ci_vars = ['CI', 'GITHUB_ACTIONS', 'RUNNER_OS', 'RUNNER_ARCH']
+    print(f"\n🌍 Environment Variables:")
+    for var in ci_vars:
+        value = os.environ.get(var, 'Not set')
+        print(f"    {var}: {value}")
+    
+    # User and Permissions
+    print(f"\n👤 User Information:")
+    print(f"    User ID: {os.getuid() if hasattr(os, 'getuid') else 'N/A'}")
+    print(f"    Group ID: {os.getgid() if hasattr(os, 'getgid') else 'N/A'}")
+    print(f"    Current Working Directory: {os.getcwd()}")
+    
+    # File System Info
+    print(f"\n📁 File System:")
+    important_dirs = ['/tmp', '/dev/shm', '/home', '/usr/bin', '/usr/local/bin']
+    for dir_path in important_dirs:
+        if os.path.exists(dir_path):
+            writeable = os.access(dir_path, os.W_OK)
+            executable = os.access(dir_path, os.X_OK)
+            print(f"    {dir_path}: Exists ✓, Writable: {'✓' if writeable else '❌'}, Executable: {'✓' if executable else '❌'}")
+        else:
+            print(f"    {dir_path}: Does not exist ❌")
+    
+    # Available Browsers
+    print(f"\n🌐 Browser Binaries:")
+    browser_paths = {
+        'Chrome': ['/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/opt/google/chrome/google-chrome'],
+        'Chromium': ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/snap/bin/chromium'],
+        'Firefox': ['/usr/bin/firefox', '/usr/bin/firefox-esr', '/snap/bin/firefox', '/opt/firefox/firefox']
+    }
+    
+    for browser, paths in browser_paths.items():
+        print(f"    {browser}:")
+        found = False
+        for path in paths:
+            if os.path.exists(path) and os.access(path, os.X_OK):
+                try:
+                    import subprocess
+                    version_result = subprocess.run([path, '--version'], capture_output=True, text=True, timeout=10)
+                    version = version_result.stdout.strip() if version_result.returncode == 0 else 'Version unknown'
+                    print(f"      ✓ {path} - {version}")
+                    found = True
+                except:
+                    print(f"      ✓ {path} - Found but version check failed")
+                    found = True
+            else:
+                print(f"      ❌ {path}")
+        if not found:
+            print(f"      ❌ No {browser} binary found")
+    
+    # WebDriver Binaries
+    print(f"\n🔧 WebDriver Binaries:")
+    webdriver_paths = {
+        'ChromeDriver': ['/usr/bin/chromedriver', '/usr/local/bin/chromedriver', '/usr/lib/chromium-browser/chromedriver'],
+        'GeckoDriver': ['/usr/bin/geckodriver', '/usr/local/bin/geckodriver']
+    }
+    
+    for driver, paths in webdriver_paths.items():
+        print(f"    {driver}:")
+        found = False
+        for path in paths:
+            if os.path.exists(path) and os.access(path, os.X_OK):
+                try:
+                    import subprocess
+                    version_result = subprocess.run([path, '--version'], capture_output=True, text=True, timeout=10)
+                    version_lines = version_result.stdout.strip().split('\n') if version_result.returncode == 0 else ['Version unknown']
+                    version = version_lines[0] if version_lines else 'Version unknown'
+                    print(f"      ✓ {path} - {version}")
+                    found = True
+                except:
+                    print(f"      ✓ {path} - Found but version check failed")
+                    found = True
+            else:
+                print(f"      ❌ {path}")
+        if not found:
+            print(f"      ❌ No {driver} binary found")
+    
+    # Running Processes
+    print(f"\n🔄 Running Processes:")
+    try:
+        import subprocess
+        for process_name in ['chrome', 'chromium', 'firefox', 'geckodriver', 'chromedriver']:
+            result = subprocess.run(['pgrep', '-f', process_name], capture_output=True, text=True)
+            if result.returncode == 0 and result.stdout.strip():
+                count = len(result.stdout.strip().split('\n'))
+                print(f"    {process_name}: {count} processes running")
+            else:
+                print(f"    {process_name}: No processes running")
+    except:
+        print("    Unable to check running processes")
+    
+    # Memory and Disk
+    print(f"\n💾 System Resources:")
+    try:
+        import subprocess
+        # Memory info
+        try:
+            mem_result = subprocess.run(['free', '-h'], capture_output=True, text=True, timeout=5)
+            if mem_result.returncode == 0:
+                mem_lines = mem_result.stdout.strip().split('\n')
+                if len(mem_lines) >= 2:
+                    print(f"    Memory: {mem_lines[1]}")
+        except:
+            print("    Memory: Unable to check")
+        
+        # Disk space
+        try:
+            disk_result = subprocess.run(['df', '-h', '/tmp'], capture_output=True, text=True, timeout=5)
+            if disk_result.returncode == 0:
+                disk_lines = disk_result.stdout.strip().split('\n')
+                if len(disk_lines) >= 2:
+                    print(f"    /tmp disk space: {disk_lines[1]}")
+        except:
+            print("    Disk space: Unable to check")
+    except:
+        print("    Unable to check system resources")
+    
+    # Network connectivity
+    print(f"\n🌍 Network Connectivity:")
+    try:
+        import requests
+        test_result = requests.get('https://httpbin.org/ip', timeout=10)
+        if test_result.status_code == 200:
+            print(f"    Internet connectivity: ✓ Working")
+            ip_info = test_result.json()
+            print(f"    Public IP: {ip_info.get('origin', 'Unknown')}")
+        else:
+            print(f"    Internet connectivity: ❌ HTTP {test_result.status_code}")
+    except Exception as e:
+        print(f"    Internet connectivity: ❌ Failed - {e}")
+    
+    print("=" * 60)
+    print("🔍 END ENVIRONMENT DEBUG\n")
+
 def main():
     print("🏫 Penn State Organizations Scraper")
     print("=" * 50)
@@ -500,6 +647,9 @@ def main():
     print("🔄 Multi-strategy approach: Requests → Firefox → Chrome")
     print("✂️  Organization names will be cleaned")
     print("=" * 50)
+    
+    # Add environment debugging
+    debug_environment()
     
     organizations = scrape_psu_organizations()
     
