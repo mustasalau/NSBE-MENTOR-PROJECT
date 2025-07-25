@@ -226,6 +226,32 @@ app.get("/api/check", (req, res) => {
   }
 });
 
+// Health check endpoint for monitoring services (no auth required)
+app.get("/api/health", (req, res) => {
+  const healthCheck = {
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || "development",
+    version: "1.0.0"
+  };
+
+  try {
+    // Optional: Quick database connectivity check
+    // You can uncomment this if you want to verify DB connection
+    // const dbCheck = await pool.query('SELECT 1');
+    // healthCheck.database = "connected";
+    
+    res.status(200).json(healthCheck);
+  } catch (error) {
+    res.status(503).json({
+      status: "error",
+      timestamp: new Date().toISOString(),
+      error: error.message
+    });
+  }
+});
+
 // === END AUTH ===
 
 app.post("/api/hobbies/normalize", strictRateLimit, async (req, res) => {
@@ -2223,3 +2249,6 @@ app.get('/api/test/trait-vectors', async (req, res) => {
 });
 
 app.listen(PORT, () => debugLog(`Backend running on port ${PORT}`));
+
+    
+
