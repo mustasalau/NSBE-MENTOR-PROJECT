@@ -87,7 +87,7 @@ const Home = () => {
           onLoadedData={handleVideoLoad}
         >
           {/* Multiple source formats for better compatibility */}
-          <source src="/videos/NSBEVid.mov" type="video/quicktime" />
+          <source src="/videos/NSBEVid.mp4" type="video/quicktime" />
           {/* Fallback message */}
           Your browser does not support the video tag.
         </video>
