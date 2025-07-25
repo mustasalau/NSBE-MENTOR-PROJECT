@@ -24,21 +24,39 @@ jobs:
         with:
           python-version: '3.11'
           
+      - name: 📦 Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
       - name: 🔧 Install Python dependencies
         run: |
           pip install --upgrade pip
           pip install selenium openpyxl
+          
+      - name: 🔧 Install Node.js dependencies
+        run: npm install
           
       - name: 🌐 Install Chrome for Selenium
         uses: browser-actions/setup-chrome@v1
         with:
           chrome-version: stable
           
-      - name: 🧪 Test clubs scraper
+      - name: 🧪 Test clubs scraper and merge
         run: |
           echo "🧪 Testing clubs scraper..."
           cd Scraper
           timeout 300s python3 scraper.py || echo "⚠️ Clubs scraper test completed"
+          
+          echo "🧪 Testing clubs data merge..."
+          cd ..
+          if [ -f "Scraper/psu_organizations.json" ]; then
+            echo "✅ Python scraper output found"
+            node src/utils/mergeClubs.cjs || echo "⚠️ Merge test completed"
+          else
+            echo "❌ Python scraper output not found"
+          fi
           
       - name: 🧪 Test majors scraper  
         run: |

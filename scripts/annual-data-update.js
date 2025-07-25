@@ -72,7 +72,7 @@ async function runUpdate() {
     
     // Update clubs
     console.log('\n📚 Updating clubs database...');
-    const updateClubsScript = path.join(rootDir, 'src', 'utils', 'updateClubs.cjs');
+    const updateClubsScript = path.join(rootDir, 'src', 'utils', 'mergeClubs.cjs');
     const clubsResult = require(updateClubsScript)();
 
     // Update majors  

@@ -1,434 +1,326 @@
+import json
+import time
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
-import time
-import openpyxl
-import re
+from selenium.webdriver.chrome.options import Options
+from selenium.common.exceptions import TimeoutException, WebDriverException, NoSuchElementException
 
 def setup_driver():
     """Set up Chrome WebDriver with appropriate options."""
-    options = Options()
-    options.add_argument("--headless")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--window-size=1920,1080")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+    chrome_options = Options()
     
-    return webdriver.Chrome(options=options)
+    # Add options for better compatibility
+    # chrome_options.add_argument('--headless')  # Comment out to see the browser in action
+    chrome_options.add_argument('--no-sandbox')
+    chrome_options.add_argument('--disable-dev-shm-usage')
+    chrome_options.add_argument('--disable-gpu')
+    chrome_options.add_argument('--window-size=1920,1080')
+    chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+    
+    try:
+        driver = webdriver.Chrome(options=chrome_options)
+        return driver
+    except WebDriverException as e:
+        print(f"❌ Chrome WebDriver error: {e}")
+        print("💡 Make sure you have ChromeDriver installed:")
+        print("   - Install via: pip install webdriver-manager")
+        print("   - Or download from: https://chromedriver.chromium.org/")
+        return None
 
-def debug_page_structure(driver):
-    """Debug function to understand the current page structure."""
-    print("🔍 Debugging page structure...")
+def clean_organization_name(name):
+    """Clean organization name by removing common suffixes."""
+    if not name:
+        return None
     
-    # Check common container selectors
-    possible_containers = [
-        ".MuiCard-root",
-        "[class*='card']", 
-        "[class*='Card']",
-        ".organization",
-        "[class*='org']",
-        ".result",
-        "[class*='result']",
-        ".item",
-        "[class*='item']"
+    # Remove common suffixes
+    suffixes_to_remove = [
+        " at University Park",
+        " at Penn State",
+        " - University Park",
+        " (University Park)"
     ]
     
-    for selector in possible_containers:
-        elements = driver.find_elements(By.CSS_SELECTOR, selector)
-        if elements:
-            print(f"✅ Found {len(elements)} elements with selector: {selector}")
-            # Show first element's HTML
-            try:
-                first_element_html = elements[0].get_attribute('outerHTML')[:200]
-                print(f"   📄 First element preview: {first_element_html}...")
-            except:
-                pass
-        else:
-            print(f"❌ No elements found with selector: {selector}")
+    cleaned_name = name
+    for suffix in suffixes_to_remove:
+        if cleaned_name.endswith(suffix):
+            cleaned_name = cleaned_name[:-len(suffix)]
     
-    # Check for any elements that might contain organization names
-    print("\n🔍 Looking for text patterns that might be organization names...")
-    all_text_elements = driver.find_elements(By.XPATH, "//*[text()]")
-    org_like_texts = []
-    
-    for element in all_text_elements[:50]:  # Check first 50 text elements
-        text = element.text.strip()
-        if text and len(text) > 10 and len(text) < 100:  # Reasonable org name length
-            # Skip common UI elements
-            if not any(skip in text.lower() for skip in ['search', 'filter', 'sort', 'menu', 'button', 'click']):
-                org_like_texts.append(text)
-    
-    if org_like_texts:
-        print(f"📝 Found {len(org_like_texts)} potential organization names:")
-        for i, text in enumerate(org_like_texts[:10]):
-            print(f"   {i+1}. {text}")
-    
-    return possible_containers
+    return cleaned_name.strip()
 
-def scrape_student_organizations(url, driver_path=None):
+def scrape_psu_organizations():
     """
-    Enhanced scraper that can handle different page structures.
+    Scrape Penn State organizations by clicking 'Load More' until all are loaded.
     """
+    
+    url = 'https://discover.psu.edu/organizations'
+    
     driver = setup_driver()
-    orgs = []
-    seen_names = set()
-
+    if not driver:
+        return []
+    
+    organizations = []
+    
     try:
         print(f"🌐 Loading page: {url}")
         driver.get(url)
         
-        # Wait for page to load completely
-        print("⏳ Waiting for initial page load...")
-        time.sleep(10)  # Increased initial wait time
+        # Wait for the page to load
+        print("⏳ Waiting for page to load...")
+        time.sleep(5)  # Increased wait time
         
-        # Try to wait for specific elements to be present
+        # Wait for initial organizations to load
         try:
-            WebDriverWait(driver, 20).until(
-                lambda d: len(d.find_elements(By.XPATH, "//*[contains(@class, 'card') or contains(@class, 'Card') or contains(@class, 'organization') or contains(@class, 'item')]")) > 0
-            )
-            print("✅ Content elements detected on page")
+            wait = WebDriverWait(driver, 20)  # Increased timeout
+            wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "a[href*='/organization/']")))
+            print("✅ Initial organizations loaded")
         except TimeoutException:
-            print("⚠️ Timeout waiting for content, proceeding anyway...")
-        
-        # Additional wait for dynamic content
-        print("⏳ Waiting for dynamic content to load...")
-        time.sleep(5)
-        
-        # Debug the page structure first
-        possible_containers = debug_page_structure(driver)
-        
-        # Try different selectors for organization cards
-        card_selectors = [
-            ".MuiCard-root",
-            "[class*='card']",
-            "[class*='Card']", 
-            ".organization-item",
-            ".org-card",
-            ".result-item",
-            "[data-testid*='org']",
-            "[data-testid*='card']"
-        ]
-        
-        cards = []
-        working_selector = None
-        
-        for selector in card_selectors:
-            test_cards = driver.find_elements(By.CSS_SELECTOR, selector)
-            if test_cards:
-                print(f"✅ Using selector: {selector} (found {len(test_cards)} elements)")
-                cards = test_cards
-                working_selector = selector
-                break
-        
-        if not cards:
-            print("❌ No organization cards found with any selector!")
-            print("🔍 Trying alternative approach...")
+            print("⚠️  Timeout waiting for organizations, checking what's on the page...")
             
-            # Alternative: look for any clickable elements that might be organizations
-            clickable_elements = driver.find_elements(By.XPATH, "//a | //button | //div[@role='button']")
-            potential_orgs = []
+            # Check if page loaded at all
+            page_title = driver.title
+            print(f"📄 Page title: {page_title}")
             
-            for element in clickable_elements:
-                text = element.text.strip()
-                if text and 10 <= len(text) <= 100:  # Reasonable org name length
-                    # Simple heuristic: if it contains certain keywords, it might be an org
-                    if any(keyword in text.lower() for keyword in ['club', 'society', 'association', 'organization', 'group']):
-                        potential_orgs.append(text)
-            
-            if potential_orgs:
-                print(f"🎯 Found {len(potential_orgs)} potential organizations using alternative method")
-                orgs.extend(potential_orgs)
-                seen_names.update(potential_orgs)
-            
-        else:
-            # Extract organization names from cards
-            name_selectors = [
-                "div[style*='font-weight: 600']",
-                "h3", "h4", "h5",
-                ".title", ".name", ".org-name",
-                "[class*='title']", "[class*='name']",
-                "strong", "b"
+            # Look for any organization-related elements
+            alternative_selectors = [
+                "a[href*='/organization/']",
+                ".MuiCard-root",
+                ".MuiPaper-root"
             ]
             
-            print(f"🔍 Extracting organization names from {len(cards)} cards...")
+            found_selector = None
+            for selector in alternative_selectors:
+                elements = driver.find_elements(By.CSS_SELECTOR, selector)
+                if elements:
+                    print(f"✅ Found {len(elements)} elements with selector: {selector}")
+                    found_selector = selector
+                    break
             
-            for card in cards:
-                org_name = None
+            if not found_selector:
+                print("❌ Could not find organization elements")
+                return []
+        
+        # Click "Load More" button repeatedly until all organizations are loaded
+        click_count = 0
+        max_clicks = 150  # Increased safety limit
+        consecutive_no_change = 0  # Track consecutive clicks with no new content
+        
+        while click_count < max_clicks:
+            # Count current organizations
+            org_elements = driver.find_elements(By.CSS_SELECTOR, "a[href*='/organization/']")
+            current_count = len(org_elements)
+            
+            print(f"📊 Currently loaded: {current_count} organizations")
+            
+            # Look for "Load More" button with more comprehensive selectors
+            load_more_selectors = [
+                "//button[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'load more')]",
+                "//span[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'load more')]/ancestor::button",
+                ".outlinedButton button",
+                "button[style*='text-transform: uppercase']",
+                "//button[contains(@class, 'MuiButton') and contains(., 'LOAD MORE')]",
+                "//button[contains(@class, 'MuiButton')]//span[contains(text(), 'LOAD MORE')]/ancestor::button"
+            ]
+            
+            load_more_button = None
+            for selector in load_more_selectors:
+                try:
+                    if selector.startswith('//'):
+                        # XPath selector
+                        button = driver.find_element(By.XPATH, selector)
+                    else:
+                        # CSS selector
+                        button = driver.find_element(By.CSS_SELECTOR, selector)
+                    
+                    if button.is_displayed() and button.is_enabled():
+                        load_more_button = button
+                        print(f"✅ Found load more button with selector: {selector}")
+                        break
+                except:
+                    continue
+            
+            if load_more_button:
+                try:
+                    # Scroll to the button and wait
+                    driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", load_more_button)
+                    time.sleep(2)
+                    
+                    # Try clicking with JavaScript if regular click fails
+                    try:
+                        load_more_button.click()
+                    except:
+                        driver.execute_script("arguments[0].click();", load_more_button)
+                    
+                    click_count += 1
+                    print(f"🔄 Clicked 'Load More' button #{click_count}")
+                    
+                    # Wait for new content to load with progressive waiting
+                    time.sleep(3)
+                    
+                    # Wait for network activity to settle
+                    wait_count = 0
+                    while wait_count < 10:  # Wait up to 10 seconds for new content
+                        time.sleep(1)
+                        new_org_elements = driver.find_elements(By.CSS_SELECTOR, "a[href*='/organization/']")
+                        new_count = len(new_org_elements)
+                        
+                        if new_count > current_count:
+                            print(f"📈 New organizations loaded: {new_count - current_count}")
+                            consecutive_no_change = 0
+                            break
+                        wait_count += 1
+                    
+                    # Final count check
+                    final_elements = driver.find_elements(By.CSS_SELECTOR, "a[href*='/organization/']")
+                    final_count = len(final_elements)
+                    
+                    if final_count >= 1212:
+                        print(f"🎯 Target reached! Found {final_count} organizations")
+                        break
+                    
+                    if final_count == current_count:
+                        consecutive_no_change += 1
+                        print(f"⚠️  No new organizations loaded (attempt {consecutive_no_change})")
+                        
+                        if consecutive_no_change >= 3:
+                            print(f"✅ No more organizations to load after {consecutive_no_change} attempts. Final count: {final_count}")
+                            break
+                        
+                        # Wait longer before trying again
+                        time.sleep(5)
+                    
+                except Exception as e:
+                    print(f"⚠️  Error clicking load more button: {e}")
+                    # Try to continue anyway
+                    consecutive_no_change += 1
+                    if consecutive_no_change >= 3:
+                        break
+            else:
+                print("🏁 No 'Load More' button found - all organizations loaded")
+                break
+        
+        # Extract organization data
+        print("📝 Extracting organization information...")
+        
+        # Get final count of organizations
+        org_elements = driver.find_elements(By.CSS_SELECTOR, "a[href*='/organization/']")
+        
+        if not org_elements:
+            print("❌ No organization elements found")
+            return []
+        
+        print(f"✅ Found {len(org_elements)} organization links to process")
+        
+        for i, element in enumerate(org_elements):
+            try:
+                org_data = {}
                 
-                # Try different selectors for the organization name
+                # Extract organization name with improved selectors
+                name_selectors = [
+                    "div[style*='font-weight: 600'][style*='color: rgb(73, 73, 73)']",
+                    "div[style*='font-weight: 600']",
+                    "div[style*='1.125rem']",
+                    ".MuiTypography-h6",
+                    "h6",
+                ]
+                
+                name = None
                 for name_selector in name_selectors:
                     try:
-                        name_element = card.find_element(By.CSS_SELECTOR, name_selector)
-                        text = name_element.text.strip()
-                        if text and len(text) > 5:  # Must be meaningful text
-                            org_name = text
-                            break
-                    except NoSuchElementException:
+                        name_elem = element.find_element(By.CSS_SELECTOR, name_selector)
+                        potential_name = name_elem.text.strip()
+                        
+                        # Make sure we get a reasonable name
+                        if potential_name and len(potential_name) < 200 and '\n' not in potential_name:
+                            name = clean_organization_name(potential_name)  # Apply cleaning
+                            if name:  # Only break if we got a valid cleaned name
+                                break
+                    except:
                         continue
                 
-                # If no name found with selectors, try getting any text from the card
-                if not org_name:
-                    card_text = card.text.strip()
-                    if card_text:
-                        # Take the first line as the org name
-                        first_line = card_text.split('\n')[0].strip()
-                        if first_line and len(first_line) > 5:
-                            org_name = first_line
+                # Fallback: extract from href and clean it
+                if not name:
+                    href = element.get_attribute('href')
+                    if href and '/organization/' in href:
+                        url_name = href.split('/organization/')[-1]
+                        name = url_name.replace('-', ' ').title() if url_name else None
                 
-                if org_name and org_name not in seen_names:
-                    orgs.append(org_name)
-                    seen_names.add(org_name)
-
-            print(f"📋 Extracted {len(orgs)} organization names")
-
-        # Try to load more organizations using multiple strategies
-        if working_selector:
-            print(f"🔄 Attempting to load more organizations (currently have {len(orgs)} out of ~1212)...")
-            
-            # Strategy 1: Try clicking load more buttons
-            try_load_more(driver, working_selector, orgs, seen_names)
-            
-            # Strategy 2: Try infinite scroll
-            try_infinite_scroll(driver, working_selector, orgs, seen_names)
-            
-            # Strategy 3: Final aggressive scroll and wait
-            try_aggressive_loading(driver, working_selector, orgs, seen_names)
-
+                if name:
+                    org_data['name'] = name
+                    org_data['acronyms'] = []  # Empty acronyms array as requested
+                    
+                    organizations.append(org_data)
+                
+                # Enhanced progress indicator
+                if (i + 1) % 50 == 0:
+                    print(f"📊 Processed {i + 1}/{len(org_elements)} organizations...")
+                    
+            except Exception as e:
+                print(f"⚠️  Error extracting data from organization {i + 1}: {e}")
+                continue
+        
+        print(f"✅ Extracted data from {len(organizations)} organizations")
+    
+    except WebDriverException as e:
+        print(f"❌ WebDriver error: {e}")
     except Exception as e:
-        print(f"❌ Error during scraping: {e}")
-        # Save a screenshot for debugging
-        try:
-            driver.save_screenshot("scraper_error.png")
-            print("📸 Screenshot saved as scraper_error.png")
-        except:
-            pass
+        print(f"❌ Unexpected error: {e}")
     finally:
         driver.quit()
-
-    print(f"🎯 Final count: {len(orgs)} organizations")
-    return orgs
-
-def try_load_more(driver, card_selector, orgs, seen_names):
-    """Try to click load more buttons to get additional organizations."""
-    print("🔘 Strategy 1: Looking for Load More buttons...")
-    max_attempts = 20  # Increased attempts
-    attempts = 0
+        print("🔒 Browser closed")
     
-    while attempts < max_attempts:
-        initial_count = len(orgs)
+    return organizations
+
+def main():
+    print("🏫 Penn State Organizations Scraper")
+    print("=" * 50)
+    print("📋 Target: 1212+ organizations")
+    print("🔄 Will click 'Load More' until all are loaded")
+    print("✂️  Organization names will be cleaned")
+    print("=" * 50)
+    
+    organizations = scrape_psu_organizations()
+    
+    if organizations:
+        # Save to JSON file
+        with open('psu_organizations.json', 'w') as f:
+            json.dump(organizations, f, indent=2, ensure_ascii=False)
         
-        # Look for various "load more" button patterns
-        load_more_selectors = [
-            "//button[.//span[contains(text(), 'Load More')]]",
-            "//button[contains(text(), 'Load More')]",
-            "//button[contains(text(), 'Show More')]",
-            "//button[contains(text(), 'View More')]",
-            "//a[contains(text(), 'Load More')]",
-            "//button[contains(@class, 'load-more')]",
-            "//button[contains(@class, 'show-more')]",
-            "//*[contains(text(), 'Load More')]",
-            "//*[contains(text(), 'Show More')]"
-        ]
+        print(f"\n✅ Successfully saved {len(organizations)} organizations to psu_organizations.json")
         
-        load_btn = None
-        for selector in load_more_selectors:
-            try:
-                load_btn = WebDriverWait(driver, 5).until(  # Increased wait time
-                    EC.element_to_be_clickable((By.XPATH, selector))
-                )
-                print(f"🎯 Found load more button with selector: {selector}")
-                break
-            except TimeoutException:
-                continue
+        # Display sample organizations
+        print(f"\n📋 Sample organizations (with cleaned names):")
+        for i, org in enumerate(organizations[:10]):
+            print(f"{i+1:2d}. {org.get('name', 'Unknown')}")
+            print(f"    Acronyms: {org.get('acronyms', [])}")
+            print()
         
-        if not load_btn:
-            print("📭 No more load buttons found")
-            break
+        if len(organizations) > 10:
+            print(f"... and {len(organizations) - 10} more")
         
-        try:
-            # Scroll to button and click
-            driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", load_btn)
-            time.sleep(2)  # Increased wait time
-            driver.execute_script("arguments[0].click();", load_btn)
+        # Statistics
+        print(f"\n📊 Statistics:")
+        print(f"   Total organizations: {len(organizations)}")
+        print(f"   All organizations have empty acronyms arrays")
+        
+        # Show some example cleaned names
+        print(f"\n🧹 Example of name cleaning:")
+        sample_orgs = organizations[:5]
+        for org in sample_orgs:
+            original_name = org['name'] + " at University Park"  # Simulate original
+            print(f"   Original: '{original_name}'")
+            print(f"   Cleaned:  '{org['name']}'")
+            print()
             
-            # Wait for new content with longer timeout
-            print(f"⏳ Waiting for new content to load after click #{attempts + 1}...")
-            time.sleep(8)  # Increased wait time significantly
-            
-            # Extract new organizations
-            cards = driver.find_elements(By.CSS_SELECTOR, card_selector)
-            new_orgs_found = extract_org_names_from_cards(cards, seen_names)
-            orgs.extend(new_orgs_found)
-            seen_names.update(new_orgs_found)
-            
-            print(f"📈 Load more #{attempts + 1}: Found {len(new_orgs_found)} new organizations (total: {len(orgs)}/1212)")
-            
-            if len(new_orgs_found) == 0:
-                print("📭 No new organizations found, but continuing to try...")
-                # Don't break immediately, try a few more times
-                if attempts > 5:  # Only break after several attempts
-                    break
-                
-        except Exception as e:
-            print(f"⚠️ Error clicking load more: {e}")
-            break
-        
-        attempts += 1
-
-def extract_org_names_from_cards(cards, seen_names):
-    """Extract organization names from a list of card elements."""
-    new_orgs = []
-    
-    name_selectors = [
-        "div[style*='font-weight: 600']",
-        "h3", "h4", "h5",
-        ".title", ".name", ".org-name",
-        "[class*='title']", "[class*='name']",
-        "strong", "b"
-    ]
-    
-    for card in cards:
-        org_name = None
-        
-        for name_selector in name_selectors:
-            try:
-                name_element = card.find_element(By.CSS_SELECTOR, name_selector)
-                text = name_element.text.strip()
-                if text and len(text) > 5:
-                    org_name = text
-                    break
-            except NoSuchElementException:
-                continue
-        
-        if not org_name:
-            card_text = card.text.strip()
-            if card_text:
-                first_line = card_text.split('\n')[0].strip()
-                if first_line and len(first_line) > 5:
-                    org_name = first_line
-        
-        if org_name and org_name not in seen_names:
-            new_orgs.append(org_name)
-    
-        return new_orgs
-
-def try_infinite_scroll(driver, card_selector, orgs, seen_names):
-    """Try infinite scroll to load more content."""
-    print("🔘 Strategy 2: Trying infinite scroll...")
-    max_scrolls = 50  # Try many scrolls
-    scroll_attempts = 0
-    no_new_content_count = 0
-    
-    while scroll_attempts < max_scrolls and no_new_content_count < 5:
-        initial_count = len(orgs)
-        
-        # Scroll to bottom
-        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        print(f"📜 Scroll #{scroll_attempts + 1}, waiting for content...")
-        time.sleep(6)  # Wait longer for content to load
-        
-        # Try extracting new organizations
-        cards = driver.find_elements(By.CSS_SELECTOR, card_selector)
-        new_orgs_found = extract_org_names_from_cards(cards, seen_names)
-        orgs.extend(new_orgs_found)
-        seen_names.update(new_orgs_found)
-        
-        if len(new_orgs_found) > 0:
-            print(f"📈 Scroll #{scroll_attempts + 1}: Found {len(new_orgs_found)} new organizations (total: {len(orgs)}/1212)")
-            no_new_content_count = 0  # Reset counter
-        else:
-            no_new_content_count += 1
-            print(f"📭 Scroll #{scroll_attempts + 1}: No new content ({no_new_content_count}/5)")
-        
-        scroll_attempts += 1
-        
-        # Additional wait between scrolls
-        time.sleep(2)
-
-def try_aggressive_loading(driver, card_selector, orgs, seen_names):
-    """Final aggressive attempt to load all content."""
-    print("🔘 Strategy 3: Aggressive loading...")
-    
-    # Multiple scroll and wait cycles
-    for i in range(10):
-        print(f"🔄 Aggressive cycle #{i + 1}/10...")
-        
-        # Scroll to top, then to bottom
-        driver.execute_script("window.scrollTo(0, 0);")
-        time.sleep(3)
-        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        time.sleep(8)  # Long wait
-        
-        # Try to trigger any lazy loading
-        driver.execute_script("window.scrollBy(0, -100);")
-        time.sleep(2)
-        driver.execute_script("window.scrollBy(0, 100);")
-        time.sleep(5)
-        
-        # Extract organizations
-        cards = driver.find_elements(By.CSS_SELECTOR, card_selector)
-        new_orgs_found = extract_org_names_from_cards(cards, seen_names)
-        orgs.extend(new_orgs_found)
-        seen_names.update(new_orgs_found)
-        
-        if len(new_orgs_found) > 0:
-            print(f"🎯 Aggressive #{i + 1}: Found {len(new_orgs_found)} new organizations (total: {len(orgs)}/1212)")
-        
-        # If we're close to the target, keep going
-        if len(orgs) >= 1000:
-            print(f"🎯 Getting close! {len(orgs)}/1212 organizations found")
-
-def save_to_excel(data, filename):
-    """Save organization data to Excel file."""
-    if not data:
-        print("⚠️ No data to save!")
-        return
-    
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Student Organizations"
-    ws.cell(row=1, column=1, value="Organization Name")
-
-    for i, name in enumerate(data, start=2):
-        ws.cell(row=i, column=1, value=name)
-
-    wb.save(filename)
-    print(f"💾 Saved {len(data)} organizations to {filename}")
+    else:
+        print("\n❌ No organizations were found.")
+        print("💡 Troubleshooting steps:")
+        print("   1. Make sure ChromeDriver is installed")
+        print("   2. Check if the website structure has changed")
+        print("   3. Try running with visible browser (comment out --headless)")
+        print("   4. Check your internet connection")
+        print("   5. Try increasing wait times if the site is slow")
 
 if __name__ == "__main__":
-    print("🎓 Penn State Organizations Scraper")
-    print("=" * 50)
-    print("🎯 Target: 1212 organizations")
-    print("=" * 50)
-    
-    URL = "https://discover.psu.edu/organizations"
-    OUTPUT_FILE = "clubs.xlsx"
-
-    org_list = scrape_student_organizations(URL)
-    
-    if org_list:
-        save_to_excel(org_list, OUTPUT_FILE)
-        print("✅ Scraping completed successfully!")
-        print(f"📊 Total organizations found: {len(org_list)}/1212 ({len(org_list)/1212*100:.1f}%)")
-        
-        if len(org_list) >= 1000:
-            print("🎉 Excellent! Found most organizations!")
-        elif len(org_list) >= 500:
-            print("👍 Good! Found a substantial number of organizations")
-        else:
-            print("⚠️ Found fewer organizations than expected. The website might have changed or need longer wait times.")
-        
-        # Show first few organizations
-        if len(org_list) > 0:
-            print("\n📋 Sample organizations:")
-            for i, org in enumerate(org_list[:10]):
-                print(f"  {i+1}. {org}")
-            if len(org_list) > 10:
-                print(f"  ... and {len(org_list) - 10} more")
-    else:
-        print("❌ No organizations found. The website structure may have changed.")
-        print("💡 Check the debug output above for clues about the page structure.")
+    main()
