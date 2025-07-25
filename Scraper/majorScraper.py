@@ -108,9 +108,30 @@ def setup_driver():
     default_profile_dir = os.path.join(user_data_dir, 'Default')
     os.makedirs(default_profile_dir, exist_ok=True)
     
-    # Set proper permissions
-    os.chmod(user_data_dir, 0o755)
-    os.chmod(default_profile_dir, 0o755)
+    # Set proper permissions (more permissive to allow Chrome to write files)
+    os.chmod(user_data_dir, 0o777)
+    os.chmod(default_profile_dir, 0o777)
+    
+    # Create a basic preferences file to prevent Chrome from trying to write it
+    prefs_file = os.path.join(default_profile_dir, 'Preferences')
+    try:
+        with open(prefs_file, 'w') as f:
+            f.write('{}')  # Empty JSON object
+        os.chmod(prefs_file, 0o666)
+        print(f"🗂️ Created preferences file: {prefs_file}")
+    except Exception as pref_error:
+        print(f"⚠️ Could not create preferences file: {pref_error}")
+    
+    # Create other necessary Chrome files
+    try:
+        # Create Local State file
+        local_state_file = os.path.join(user_data_dir, 'Local State')
+        with open(local_state_file, 'w') as f:
+            f.write('{}')
+        os.chmod(local_state_file, 0o666)
+        print(f"🗂️ Created local state file: {local_state_file}")
+    except Exception as state_error:
+        print(f"⚠️ Could not create local state file: {state_error}")
     
     print(f"🗂️ Created unique user data directory: {user_data_dir}")
     print(f"🗂️ Created profile directory: {default_profile_dir}")
@@ -149,9 +170,30 @@ def setup_driver():
                 default_profile_dir = os.path.join(simple_user_dir, 'Default')
                 os.makedirs(default_profile_dir, exist_ok=True)
                 
-                # Set proper permissions
-                os.chmod(simple_user_dir, 0o755)
-                os.chmod(default_profile_dir, 0o755)
+                # Set proper permissions (more permissive to allow Chrome to write files)
+                os.chmod(simple_user_dir, 0o777)
+                os.chmod(default_profile_dir, 0o777)
+                
+                # Create a basic preferences file to prevent Chrome from trying to write it
+                prefs_file = os.path.join(default_profile_dir, 'Preferences')
+                try:
+                    with open(prefs_file, 'w') as f:
+                        f.write('{}')  # Empty JSON object
+                    os.chmod(prefs_file, 0o666)
+                    print(f"🗂️ Created preferences file: {prefs_file}")
+                except Exception as pref_error:
+                    print(f"⚠️ Could not create preferences file: {pref_error}")
+                
+                # Create other necessary Chrome files
+                try:
+                    # Create Local State file
+                    local_state_file = os.path.join(simple_user_dir, 'Local State')
+                    with open(local_state_file, 'w') as f:
+                        f.write('{}')
+                    os.chmod(local_state_file, 0o666)
+                    print(f"🗂️ Created local state file: {local_state_file}")
+                except Exception as state_error:
+                    print(f"⚠️ Could not create local state file: {state_error}")
                 
                 temp_options.add_argument(f'--user-data-dir={simple_user_dir}')
                 temp_options.add_argument(f'--profile-directory=Default')

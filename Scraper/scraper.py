@@ -128,9 +128,30 @@ def setup_driver():
     default_profile_dir = os.path.join(user_data_dir, 'Default')
     os.makedirs(default_profile_dir, exist_ok=True)
     
-    # Set proper permissions
-    os.chmod(user_data_dir, 0o755)
-    os.chmod(default_profile_dir, 0o755)
+    # Set proper permissions (more permissive to allow Chrome to write files)
+    os.chmod(user_data_dir, 0o777)
+    os.chmod(default_profile_dir, 0o777)
+    
+    # Create a basic preferences file to prevent Chrome from trying to write it
+    prefs_file = os.path.join(default_profile_dir, 'Preferences')
+    try:
+        with open(prefs_file, 'w') as f:
+            f.write('{}')  # Empty JSON object
+        os.chmod(prefs_file, 0o666)
+        print(f"🗂️ Created preferences file: {prefs_file}")
+    except Exception as pref_error:
+        print(f"⚠️ Could not create preferences file: {pref_error}")
+    
+    # Create other necessary Chrome files
+    try:
+        # Create Local State file
+        local_state_file = os.path.join(user_data_dir, 'Local State')
+        with open(local_state_file, 'w') as f:
+            f.write('{}')
+        os.chmod(local_state_file, 0o666)
+        print(f"🗂️ Created local state file: {local_state_file}")
+    except Exception as state_error:
+        print(f"⚠️ Could not create local state file: {state_error}")
     
     print(f"🗂️ Created unique user data directory: {user_data_dir}")
     print(f"🗂️ Created profile directory: {default_profile_dir}")
@@ -168,6 +189,13 @@ def setup_driver():
                 temp_options.add_argument('--disable-component-update')  # Disable component updates
                 temp_options.add_argument('--disable-default-apps')  # Disable default apps
                 temp_options.add_argument('--disable-sync')  # Disable sync
+                temp_options.add_argument('--disable-client-side-phishing-detection')  # Disable phishing detection
+                temp_options.add_argument('--disable-background-networking')  # Disable background networking
+                temp_options.add_argument('--disable-features=MediaRouter')  # Disable media router
+                temp_options.add_argument('--disable-ipc-flooding-protection')  # Disable IPC protection
+                temp_options.add_argument('--no-first-run')  # Skip first run experience
+                temp_options.add_argument('--no-default-browser-check')  # Skip default browser check
+                temp_options.add_argument('--disable-translate')  # Disable translate
                 
                 # Always use a unique user data directory, even for minimal setup
                 simple_user_dir = f'/dev/shm/chrome_simple_{unique_id}_{timestamp}'
@@ -177,9 +205,30 @@ def setup_driver():
                 default_profile_dir = os.path.join(simple_user_dir, 'Default')
                 os.makedirs(default_profile_dir, exist_ok=True)
                 
-                # Set proper permissions
-                os.chmod(simple_user_dir, 0o755)
-                os.chmod(default_profile_dir, 0o755)
+                # Set proper permissions (more permissive to allow Chrome to write files)
+                os.chmod(simple_user_dir, 0o777)
+                os.chmod(default_profile_dir, 0o777)
+                
+                # Create a basic preferences file to prevent Chrome from trying to write it
+                prefs_file = os.path.join(default_profile_dir, 'Preferences')
+                try:
+                    with open(prefs_file, 'w') as f:
+                        f.write('{}')  # Empty JSON object
+                    os.chmod(prefs_file, 0o666)
+                    print(f"🗂️ Created preferences file: {prefs_file}")
+                except Exception as pref_error:
+                    print(f"⚠️ Could not create preferences file: {pref_error}")
+                
+                # Create other necessary Chrome files
+                try:
+                    # Create Local State file
+                    local_state_file = os.path.join(simple_user_dir, 'Local State')
+                    with open(local_state_file, 'w') as f:
+                        f.write('{}')
+                    os.chmod(local_state_file, 0o666)
+                    print(f"🗂️ Created local state file: {local_state_file}")
+                except Exception as state_error:
+                    print(f"⚠️ Could not create local state file: {state_error}")
                 
                 temp_options.add_argument(f'--user-data-dir={simple_user_dir}')
                 temp_options.add_argument(f'--profile-directory=Default')
@@ -204,26 +253,34 @@ def setup_driver():
                     print(f"❌ Attempt 2 failed: {e2}")
                     print("🔄 Attempt 3: Ultra-minimal Chrome with memory-only profile")
                     
-                    # Last resort: try with in-memory user data directory
+                    # Last resort: try with completely temporary approach
                     ultra_options = Options()
                     ultra_options.add_argument('--headless')
                     ultra_options.add_argument('--no-sandbox')
                     ultra_options.add_argument('--disable-dev-shm-usage')
                     ultra_options.add_argument('--disable-gpu')
-                    ultra_options.add_argument('--memory-pressure-off')
-                    ultra_options.add_argument('--max_old_space_size=4000')
-                    ultra_options.add_argument('--disable-background-timer-throttling')
-                    ultra_options.add_argument('--disable-backgrounding-occluded-windows')
-                    ultra_options.add_argument('--disable-renderer-backgrounding')
                     ultra_options.add_argument('--disable-extensions')
                     ultra_options.add_argument('--disable-plugins')
                     ultra_options.add_argument('--disable-images')
-                    ultra_options.add_argument('--disable-javascript')  # Disable JS for ultra-minimal
-                    ultra_options.add_argument('--virtual-time-budget=1000')
-                    
-                    # Try without any user data directory at all
                     ultra_options.add_argument('--disable-web-security')
                     ultra_options.add_argument('--disable-features=VizDisplayCompositor')
+                    ultra_options.add_argument('--no-first-run')
+                    ultra_options.add_argument('--no-default-browser-check')
+                    ultra_options.add_argument('--disable-sync')
+                    ultra_options.add_argument('--disable-background-networking')
+                    ultra_options.add_argument('--disable-background-timer-throttling')
+                    ultra_options.add_argument('--disable-client-side-phishing-detection')
+                    ultra_options.add_argument('--disable-component-update')
+                    ultra_options.add_argument('--disable-default-apps')
+                    ultra_options.add_argument('--disable-translate')
+                    ultra_options.add_argument('--disable-logging')
+                    ultra_options.add_argument('--silent')
+                    
+                    # Try with a super simple temp directory
+                    import tempfile
+                    ultra_temp_dir = tempfile.mkdtemp(prefix='chrome_ultra_', dir='/dev/shm')
+                    ultra_options.add_argument(f'--user-data-dir={ultra_temp_dir}')
+                    print(f"🗂️ Ultra-minimal temp directory: {ultra_temp_dir}")
                     
                     if chrome_binary:
                         ultra_options.binary_location = chrome_binary
