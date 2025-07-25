@@ -129,38 +129,70 @@ def setup_firefox_driver():
         
         if is_ci:
             print("🤖 CI mode - using system Firefox")
-            # In CI, try to use system Firefox/Geckodriver
             
-            # Try to find Firefox binary
-            firefox_paths = [
-                '/usr/bin/firefox',
-                '/usr/bin/firefox-esr',
-                '/snap/bin/firefox',
-                '/opt/firefox/firefox'
+            # In CI, try different Firefox approaches
+            firefox_approaches = [
+                {
+                    'name': 'System Firefox with profile',
+                    'binary': '/usr/bin/firefox',
+                    'use_profile': True
+                },
+                {
+                    'name': 'Snap Firefox',
+                    'binary': '/snap/bin/firefox', 
+                    'use_profile': True
+                },
+                {
+                    'name': 'System Firefox minimal',
+                    'binary': '/usr/bin/firefox',
+                    'use_profile': False
+                },
+                {
+                    'name': 'Auto-detect Firefox',
+                    'binary': None,
+                    'use_profile': False
+                }
             ]
             
-            firefox_binary = None
-            for path in firefox_paths:
-                if os.path.exists(path) and os.access(path, os.X_OK):
-                    firefox_binary = path
-                    print(f"🔍 Found Firefox binary: {firefox_binary}")
-                    break
+            for i, approach in enumerate(firefox_approaches, 1):
+                try:
+                    print(f"  🔄 Firefox attempt {i}: {approach['name']}")
+                    
+                    # Create fresh options for each attempt
+                    opts = FirefoxOptions()
+                    opts.add_argument('--headless')
+                    opts.add_argument('--no-sandbox')
+                    opts.add_argument('--disable-dev-shm-usage')
+                    opts.add_argument('--window-size=1920,1080')
+                    
+                    # Set binary if specified
+                    if approach['binary'] and os.path.exists(approach['binary']):
+                        opts.binary_location = approach['binary']
+                        print(f"    Using Firefox binary: {approach['binary']}")
+                    
+                    # Set profile if needed
+                    if approach['use_profile']:
+                        profile_dir = f"/tmp/firefox_profile_{os.getpid()}_{int(time.time())}"
+                        opts.add_argument(f'--profile={profile_dir}')
+                        print(f"    Using profile: {profile_dir}")
+                    
+                    # Try to create driver
+                    driver = webdriver.Firefox(options=opts)
+                    print(f"  ✅ Firefox approach {i} successful!")
+                    return driver
+                    
+                except Exception as e:
+                    print(f"  ❌ Firefox approach {i} failed: {e}")
+                    continue
             
-            if firefox_binary:
-                firefox_options.binary_location = firefox_binary
-            
-            # Create a unique temp profile
-            profile_dir = f"/tmp/firefox_profile_{os.getpid()}_{int(time.time())}"
-            firefox_options.add_argument(f'--profile={profile_dir}')
-            
-            driver = webdriver.Firefox(options=firefox_options)
+            print("❌ All Firefox approaches failed")
+            return None
         else:
             print("💻 Local mode - using webdriver-manager for Firefox")
             service = FirefoxService(GeckoDriverManager().install())
             driver = webdriver.Firefox(service=service, options=firefox_options)
-        
-        print("✅ Firefox WebDriver initialized successfully")
-        return driver
+            print("✅ Firefox WebDriver initialized successfully")
+            return driver
         
     except Exception as e:
         print(f"❌ Firefox setup failed: {e}")
@@ -190,8 +222,8 @@ def setup_driver():
         if driver:
             return driver, None
         
-        # Strategy 3: Try Chrome with ultra-minimal config
-        print("\n🔄 Strategy 3: Ultra-minimal Chrome")
+        # Strategy 3: Try Chrome with completely different approach
+        print("\n🔄 Strategy 3: Chrome with temp directory override")
         try:
             chrome_options = ChromeOptions()
             chrome_options.add_argument('--headless')
@@ -201,21 +233,81 @@ def setup_driver():
             chrome_options.add_argument('--single-process')
             chrome_options.add_argument('--no-zygote')
             chrome_options.add_argument('--window-size=1920,1080')
+            chrome_options.add_argument('--disable-extensions')
+            chrome_options.add_argument('--disable-plugins')
+            chrome_options.add_argument('--no-first-run')
+            chrome_options.add_argument('--disable-default-apps')
             
-            # Try different Chrome binaries
-            chrome_paths = ['/snap/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome']
-            for chrome_binary in chrome_paths:
+            # Create a completely unique user data directory in /tmp
+            import uuid
+            unique_id = str(uuid.uuid4())
+            temp_user_data = f"/tmp/chrome_ci_{unique_id}_{int(time.time() * 1000000)}"
+            
+            # Ensure directory doesn't exist and create it
+            if os.path.exists(temp_user_data):
+                shutil.rmtree(temp_user_data, ignore_errors=True)
+                time.sleep(0.5)
+            
+            os.makedirs(temp_user_data, mode=0o755)
+            chrome_options.add_argument(f'--user-data-dir={temp_user_data}')
+            print(f"  Using unique temp directory: {temp_user_data}")
+            
+            # Try different Chrome binaries based on debug info
+            chrome_binaries = ['/snap/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome']
+            
+            for chrome_binary in chrome_binaries:
                 if os.path.exists(chrome_binary):
-                    chrome_options.binary_location = chrome_binary
-                    print(f"🔍 Trying Chrome binary: {chrome_binary}")
-                    break
+                    try:
+                        print(f"  🔍 Trying Chrome binary: {chrome_binary}")
+                        chrome_options.binary_location = chrome_binary
+                        
+                        driver = webdriver.Chrome(options=chrome_options)
+                        print(f"  ✅ Chrome successful with {chrome_binary}")
+                        
+                        # Store cleanup info
+                        setup_driver.cleanup_dir = temp_user_data
+                        return driver, None
+                        
+                    except Exception as e:
+                        print(f"  ❌ Chrome failed with {chrome_binary}: {e}")
+                        continue
+            
+            # Cleanup temp directory if all failed
+            if os.path.exists(temp_user_data):
+                shutil.rmtree(temp_user_data, ignore_errors=True)
+                
+        except Exception as e:
+            print(f"❌ Chrome strategy failed: {e}")
+        
+        # Strategy 4: Try Chrome without user data directory at all
+        print("\n🔄 Strategy 4: Chrome without user data directory")
+        try:
+            chrome_options = ChromeOptions()
+            chrome_options.add_argument('--headless')
+            chrome_options.add_argument('--no-sandbox')
+            chrome_options.add_argument('--disable-dev-shm-usage')
+            chrome_options.add_argument('--disable-gpu')
+            chrome_options.add_argument('--window-size=1920,1080')
+            chrome_options.add_argument('--incognito')
+            chrome_options.add_argument('--no-first-run')
+            chrome_options.add_argument('--disable-extensions')
+            chrome_options.add_argument('--disable-plugins')
+            chrome_options.add_argument('--disable-default-apps')
+            chrome_options.add_argument('--disable-sync')
+            chrome_options.add_argument('--disable-background-networking')
+            # Try to disable user data directory entirely
+            chrome_options.add_argument('--disable-features=UserDataDir')
+            chrome_options.add_argument('--disable-features=ProfileManagement')
+            
+            # Use /snap/bin/chromium which worked in debug
+            chrome_options.binary_location = '/snap/bin/chromium'
             
             driver = webdriver.Chrome(options=chrome_options)
-            print("✅ Ultra-minimal Chrome successful")
+            print("  ✅ Chrome without user data directory successful!")
             return driver, None
             
         except Exception as e:
-            print(f"❌ Ultra-minimal Chrome failed: {e}")
+            print(f"  ❌ Chrome without user data directory failed: {e}")
         
         print("❌ All CI strategies failed")
         return None, None
@@ -489,6 +581,14 @@ def scrape_psu_organizations():
             print("🔒 Browser closed")
             
             # Cleanup temporary directories
+            if hasattr(setup_driver, 'cleanup_dir') and setup_driver.cleanup_dir:
+                try:
+                    if os.path.exists(setup_driver.cleanup_dir):
+                        shutil.rmtree(setup_driver.cleanup_dir)
+                        print(f"🧹 Cleaned up temp directory: {setup_driver.cleanup_dir}")
+                except Exception as cleanup_error:
+                    print(f"⚠️ Could not cleanup temp directory: {cleanup_error}")
+            
             cleanup_browser_processes()
 
     return organizations
