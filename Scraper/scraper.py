@@ -60,24 +60,24 @@ def setup_driver():
         # Try multiple approaches in order of preference
         approaches = [
             {
-                'name': 'No user data directory',
-                'use_user_data': False,
-                'extra_args': ['--no-user-gesture-required']
+                'name': 'Explicit temp directory (most reliable)',
+                'use_user_data': True,
+                'extra_args': ['--disable-features=VizDisplayCompositor', '--no-user-gesture-required']
             },
             {
-                'name': 'Unique temp directory with timestamp',
-                'use_user_data': True,
+                'name': 'Memory-based temp directory',
+                'use_user_data': 'memory',
                 'extra_args': ['--disable-features=VizDisplayCompositor']
             },
             {
-                'name': 'Single process mode',
-                'use_user_data': False,
+                'name': 'Single process with temp dir',
+                'use_user_data': True,
                 'extra_args': ['--single-process', '--disable-features=VizDisplayCompositor,AudioServiceOutOfProcess']
             },
             {
-                'name': 'Ultra minimal',
+                'name': 'Incognito mode',
                 'use_user_data': False,
-                'extra_args': ['--disable-gpu-sandbox', '--disable-software-rasterizer']
+                'extra_args': ['--incognito', '--disable-features=VizDisplayCompositor']
             }
         ]
         
@@ -133,15 +133,38 @@ def setup_driver():
                     import time
                     timestamp = int(time.time())
                     pid = os.getpid()
-                    unique_id = f"{timestamp}_{pid}_{uuid.uuid4().hex[:8]}"
-                    temp_dir = tempfile.mkdtemp(prefix=f'chrome_{unique_id}_', suffix='_userdata')
+                    random_suffix = uuid.uuid4().hex[:12]
+                    
+                    if approach['use_user_data'] == 'memory':
+                        # Try to use /dev/shm if available, otherwise /tmp
+                        base_dir = '/dev/shm' if os.path.exists('/dev/shm') and os.access('/dev/shm', os.W_OK) else '/tmp'
+                        temp_dir = os.path.join(base_dir, f'chrome_mem_{timestamp}_{pid}_{random_suffix}')
+                    else:
+                        temp_dir = tempfile.mkdtemp(prefix=f'chrome_{timestamp}_{pid}_', suffix=f'_{random_suffix}')
+                    
+                    # Clean up any existing directory with the same name (shouldn't happen but just in case)
+                    if os.path.exists(temp_dir):
+                        try:
+                            shutil.rmtree(temp_dir)
+                        except:
+                            pass
+                    
+                    # Create the directory
+                    os.makedirs(temp_dir, mode=0o755, exist_ok=True)
                     
                     # Ensure the directory is writable
-                    os.chmod(temp_dir, 0o755)
+                    if not os.access(temp_dir, os.W_OK):
+                        print(f"⚠️ Warning: Directory {temp_dir} is not writable")
+                        continue
                     
                     chrome_options.add_argument(f'--user-data-dir={temp_dir}')
                     print(f"🗂️ Using unique temp directory: {temp_dir}")
-                
+                elif approach['use_user_data'] is False:
+                    # Explicitly disable user data directory
+                    chrome_options.add_argument('--no-user-gesture-required')
+                    chrome_options.add_argument('--disable-session-crashed-bubble')
+                    chrome_options.add_argument('--disable-restore-session-state')
+                    print("🚫 Explicitly avoiding user data directory")
                 # Set Chrome binary if found
                 if chrome_binary:
                     chrome_options.binary_location = chrome_binary
