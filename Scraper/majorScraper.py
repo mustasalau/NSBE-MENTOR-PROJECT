@@ -116,7 +116,39 @@ def setup_driver():
         if is_ci:
             # In CI, use the system ChromeDriver (pre-installed by GitHub Actions)
             print("🤖 Running in CI mode - using system ChromeDriver")
-            driver = webdriver.Chrome(options=chrome_options)
+            
+            # First, try with a simple unique user data directory
+            try:
+                print("🔄 Attempt 1: Minimal Chrome settings with unique user data dir")
+                temp_options = Options()
+                temp_options.add_argument('--headless')
+                temp_options.add_argument('--no-sandbox')
+                temp_options.add_argument('--disable-dev-shm-usage')
+                temp_options.add_argument('--disable-gpu')
+                temp_options.add_argument('--incognito')  # Run in incognito mode
+                temp_options.add_argument('--disable-extensions')  # Disable all extensions
+                temp_options.add_argument('--disable-plugins')  # Disable plugins
+                temp_options.add_argument('--disable-images')  # Speed up loading
+                
+                # Always use a unique user data directory, even for minimal setup
+                simple_user_dir = f'/dev/shm/chrome_majors_simple_{unique_id}_{timestamp}'
+                os.makedirs(simple_user_dir, exist_ok=True)
+                temp_options.add_argument(f'--user-data-dir={simple_user_dir}')
+                print(f"🗂️ Using simple user data directory: {simple_user_dir}")
+                
+                if chrome_binary:
+                    temp_options.binary_location = chrome_binary
+                
+                driver = webdriver.Chrome(options=temp_options)
+                print("✅ Chrome WebDriver initialized successfully (minimal settings)")
+                
+                # Store for cleanup
+                setup_driver.simple_user_data_dir = simple_user_dir
+                return driver
+            except Exception as e1:
+                print(f"❌ Attempt 1 failed: {e1}")
+                print("🔄 Attempt 2: With full Chrome options")
+                driver = webdriver.Chrome(options=chrome_options)
         else:
             # Local development - use webdriver-manager for convenience
             print("💻 Running in local mode - using webdriver-manager")
@@ -249,7 +281,7 @@ def scrape_penn_state_majors_selenium():
         driver.quit()
         print("🔒 Browser closed")
         
-        # Cleanup temporary user data directory
+        # Cleanup temporary user data directories
         if hasattr(setup_driver, 'user_data_dir') and setup_driver.user_data_dir:
             try:
                 if os.path.exists(setup_driver.user_data_dir):
@@ -257,6 +289,15 @@ def scrape_penn_state_majors_selenium():
                     print(f"🧹 Cleaned up user data directory: {setup_driver.user_data_dir}")
             except Exception as cleanup_error:
                 print(f"⚠️ Could not cleanup user data directory: {cleanup_error}")
+        
+        # Also cleanup simple user data directory if it exists
+        if hasattr(setup_driver, 'simple_user_data_dir') and setup_driver.simple_user_data_dir:
+            try:
+                if os.path.exists(setup_driver.simple_user_data_dir):
+                    shutil.rmtree(setup_driver.simple_user_data_dir)
+                    print(f"🧹 Cleaned up simple user data directory: {setup_driver.simple_user_data_dir}")
+            except Exception as cleanup_error:
+                print(f"⚠️ Could not cleanup simple user data directory: {cleanup_error}")
     
     return majors
 

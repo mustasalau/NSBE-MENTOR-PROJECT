@@ -21,7 +21,7 @@ def setup_driver():
     import os
     is_ci = os.environ.get('CI') or os.environ.get('GITHUB_ACTIONS')
     
-    # Debug: Check for existing Chrome processes
+    # Debug: Check for existing Chrome processes and data directories
     if is_ci:
         import subprocess
         try:
@@ -32,6 +32,25 @@ def setup_driver():
                 print("🔍 No existing Chrome processes found")
         except:
             print("🔍 Could not check for existing Chrome processes")
+        
+        # Check for common Chrome user data directories and lock files
+        common_paths = [
+            '/tmp/.com.google.Chrome*',
+            '/tmp/.org.chromium.Chromium*', 
+            '/home/runner/.config/google-chrome',
+            '/home/runner/.config/chromium',
+            '/root/.config/google-chrome',
+            '/root/.config/chromium'
+        ]
+        
+        for path_pattern in common_paths:
+            try:
+                import glob
+                matches = glob.glob(path_pattern)
+                if matches:
+                    print(f"🔍 Found existing Chrome data: {matches}")
+            except:
+                pass
     
     # Add options for better compatibility
     if is_ci:
@@ -118,24 +137,37 @@ def setup_driver():
             # In CI, use the system ChromeDriver (pre-installed by GitHub Actions)
             print("🤖 Running in CI mode - using system ChromeDriver")
             
-            # First, try without custom user data directory
+            # First, try with a simple unique user data directory
             try:
-                print("🔄 Attempt 1: Default Chrome settings")
+                print("🔄 Attempt 1: Minimal Chrome settings with unique user data dir")
                 temp_options = Options()
                 temp_options.add_argument('--headless')
                 temp_options.add_argument('--no-sandbox')
                 temp_options.add_argument('--disable-dev-shm-usage')
                 temp_options.add_argument('--disable-gpu')
+                temp_options.add_argument('--incognito')  # Run in incognito mode
+                temp_options.add_argument('--disable-extensions')  # Disable all extensions
+                temp_options.add_argument('--disable-plugins')  # Disable plugins
+                temp_options.add_argument('--disable-images')  # Speed up loading
+                
+                # Always use a unique user data directory, even for minimal setup
+                simple_user_dir = f'/dev/shm/chrome_simple_{unique_id}_{timestamp}'
+                os.makedirs(simple_user_dir, exist_ok=True)
+                temp_options.add_argument(f'--user-data-dir={simple_user_dir}')
+                print(f"🗂️ Using simple user data directory: {simple_user_dir}")
                 
                 if chrome_binary:
                     temp_options.binary_location = chrome_binary
                 
                 driver = webdriver.Chrome(options=temp_options)
-                print("✅ Chrome WebDriver initialized successfully (default settings)")
+                print("✅ Chrome WebDriver initialized successfully (minimal settings)")
+                
+                # Store for cleanup
+                setup_driver.simple_user_data_dir = simple_user_dir
                 return driver
             except Exception as e1:
                 print(f"❌ Attempt 1 failed: {e1}")
-                print("🔄 Attempt 2: With custom user data directory")
+                print("🔄 Attempt 2: With full Chrome options")
                 driver = webdriver.Chrome(options=chrome_options)
         else:
             # Local development - use webdriver-manager for convenience
@@ -421,7 +453,7 @@ def scrape_psu_organizations():
         driver.quit()
         print("🔒 Browser closed")
         
-        # Cleanup temporary user data directory
+        # Cleanup temporary user data directories
         if hasattr(setup_driver, 'user_data_dir') and setup_driver.user_data_dir:
             try:
                 if os.path.exists(setup_driver.user_data_dir):
@@ -429,6 +461,15 @@ def scrape_psu_organizations():
                     print(f"🧹 Cleaned up user data directory: {setup_driver.user_data_dir}")
             except Exception as cleanup_error:
                 print(f"⚠️ Could not cleanup user data directory: {cleanup_error}")
+        
+        # Also cleanup simple user data directory if it exists
+        if hasattr(setup_driver, 'simple_user_data_dir') and setup_driver.simple_user_data_dir:
+            try:
+                if os.path.exists(setup_driver.simple_user_data_dir):
+                    shutil.rmtree(setup_driver.simple_user_data_dir)
+                    print(f"🧹 Cleaned up simple user data directory: {setup_driver.simple_user_data_dir}")
+            except Exception as cleanup_error:
+                print(f"⚠️ Could not cleanup simple user data directory: {cleanup_error}")
     
     return organizations
 
