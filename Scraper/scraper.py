@@ -430,7 +430,8 @@ def scrape_psu_organizations():
             # Check if we're approaching timeout (4.5 minutes = 270 seconds)
             elapsed_time = time.time() - start_time
             if elapsed_time > 270:
-                print(f"⏰ Approaching timeout after {elapsed_time:.1f}s, stopping with {len(driver.find_elements(By.CSS_SELECTOR, 'a[href*=\"/organization/\"]'))} organizations")
+                current_org_count = len(driver.find_elements(By.CSS_SELECTOR, "a[href*='/organization/']"))
+                print(f"⏰ Approaching timeout after {elapsed_time:.1f}s, stopping with {current_org_count} organizations")
                 break
             
             # Count current organizations
