@@ -155,44 +155,8 @@ const validateAndSanitize = (req, res, next) => {
 
 app.use(validateAndSanitize);
 
-// Simple rate limiting middleware
-const rateLimitMap = new Map();
-
-const rateLimit = (maxRequests = 100, windowMs = 15 * 60 * 1000) => { // 100 requests per 15 minutes
-  return (req, res, next) => {
-    const clientIP = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'];
-    const now = Date.now();
-    const windowStart = now - windowMs;
-    
-    if (!rateLimitMap.has(clientIP)) {
-      rateLimitMap.set(clientIP, []);
-    }
-    
-    const requests = rateLimitMap.get(clientIP);
-    // Remove old requests outside the window
-    const recentRequests = requests.filter(timestamp => timestamp > windowStart);
-    
-    if (recentRequests.length >= maxRequests) {
-      return res.status(429).json({
-        error: 'Too many requests. Please try again later.',
-        retryAfter: Math.ceil(windowMs / 1000)
-      });
-    }
-    
-    recentRequests.push(now);
-    rateLimitMap.set(clientIP, recentRequests);
-    
-    next();
-  };
-};
-
-// Apply rate limiting to all routes
-app.use(rateLimit());
-
-// Stricter rate limiting for expensive operations
-const strictRateLimit = rateLimit(10, 15 * 60 * 1000); // 10 requests per 15 minutes
-
 app.use("/api/traits", traitRoutes);
+
 app.use("/api/spotify", spotifyRoutes);
 
 // === AUTH LOGIC ===
@@ -280,7 +244,7 @@ app.head("/api/health", (req, res) => {
 
 // === END AUTH ===
 
-app.post("/api/hobbies/normalize", strictRateLimit, async (req, res) => {
+app.post("/api/hobbies/normalize", async (req, res) => {
   let userHobbies = req.body.hobbies;
   if (typeof userHobbies === "string") userHobbies = [userHobbies];
 
@@ -334,7 +298,7 @@ app.get("/api/hobbies/vectors", (req, res) => {
 });
 
 // Test endpoint for text vectorization
-app.post("/api/test-text-vectorization", strictRateLimit, async (req, res) => {
+app.post("/api/test-text-vectorization", async (req, res) => {
   try {
     const { text, textType, role } = req.body;
     
@@ -531,7 +495,7 @@ app.get("/api/export/approved-matches", async (req, res) => {
 });
 
 
-app.post("/api/submit", strictRateLimit, async (req, res) => {
+app.post("/api/submit", async (req, res) => {
   const data = req.body;
   
   // console.log(`🐛 Debug - Full request body:`, JSON.stringify(data, null, 2));
@@ -1978,7 +1942,7 @@ async function createAssignmentsTable() {
 createAssignmentsTable();
 
 // Submit final assignments
-app.post("/api/submit-assignments", strictRateLimit, async (req, res) => {
+app.post("/api/submit-assignments", async (req, res) => {
   try {
     const { assignments } = req.body;
     
