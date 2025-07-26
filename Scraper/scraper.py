@@ -424,12 +424,12 @@ def scrape_psu_organizations():
         start_time = time.time()  # Track timing to avoid timeout
         
         print(f"🎯 Starting Load More clicking - Target: {target_count}+ organizations")
-        print(f"⏱️ Starting at {time.strftime('%H:%M:%S')} - Max time: 4.5 minutes")
+        print(f"⏱️ Starting at {time.strftime('%H:%M:%S')} - Max time: 4.7 minutes (aggressive timing)")
         
         while click_count < max_clicks:
-            # Check if we're approaching timeout (4.5 minutes = 270 seconds)
+            # Check if we're approaching timeout (4.7 minutes = 282 seconds, leaving 18s buffer)
             elapsed_time = time.time() - start_time
-            if elapsed_time > 270:
+            if elapsed_time > 282:
                 current_org_count = len(driver.find_elements(By.CSS_SELECTOR, "a[href*='/organization/']"))
                 print(f"⏰ Approaching timeout after {elapsed_time:.1f}s, stopping with {current_org_count} organizations")
                 break
@@ -473,7 +473,7 @@ def scrape_psu_organizations():
                 try:
                     # Scroll to the button and wait
                     driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", load_more_button)
-                    time.sleep(1.5)  # Reduced from 3 to 1.5 seconds for scroll
+                    time.sleep(0.8)  # Reduced from 1.5 to 0.8 seconds for scroll
                     
                     # Try clicking with JavaScript if regular click fails
                     try:
@@ -484,16 +484,16 @@ def scrape_psu_organizations():
                     click_count += 1
                     print(f"🔄 Clicked 'Load More' button #{click_count}")
                     
-                    # Wait for new content to load - balanced timing
-                    time.sleep(3)  # Reduced from 8 to 3 seconds - still patient but not too slow
+                    # Wait for new content to load - more aggressive timing
+                    time.sleep(1.5)  # Reduced from 3 to 1.5 seconds - much faster
                     
-                    # Wait for network activity to settle with balanced waits
+                    # Wait for network activity to settle with faster checks
                     wait_count = 0
-                    max_wait = 8  # Reduced from 15 to 8 for efficiency
+                    max_wait = 5  # Reduced from 8 to 5 for speed
                     last_count = current_count
                     
                     while wait_count < max_wait:
-                        time.sleep(0.8)  # Reduced from 1.5 to 0.8 second intervals
+                        time.sleep(0.5)  # Reduced from 0.8 to 0.5 second intervals
                         new_org_elements = driver.find_elements(By.CSS_SELECTOR, "a[href*='/organization/']")
                         new_count = len(new_org_elements)
                         
@@ -514,13 +514,13 @@ def scrape_psu_organizations():
                         consecutive_no_change += 1
                         print(f"⚠️  No new organizations loaded (attempt {consecutive_no_change})")
                         
-                        if consecutive_no_change >= 4:  # Reduced from 5 to 4 attempts for efficiency
+                        if consecutive_no_change >= 3:  # Reduced from 4 to 3 attempts for speed
                             print(f"✅ No more organizations to load after {consecutive_no_change} attempts. Final count: {final_count}")
                             break
                         
-                        # Longer wait only when no progress - balanced timing
-                        print(f"⏳ Waiting extra time for potential slow loading...")
-                        time.sleep(4)  # Reduced from 10 to 4 seconds
+                        # Shorter wait when no progress - prioritize speed
+                        print(f"⏳ Brief wait for slow loading...")
+                        time.sleep(2)  # Reduced from 4 to 2 seconds
                     else:
                         # Reset consecutive failures if we got new content
                         consecutive_no_change = 0
