@@ -257,7 +257,7 @@ def scrape_psu_organizations():
                 try:
                     # Scroll to the button and wait
                     driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", load_more_button)
-                    time.sleep(0.8)  # Reduced from 1.5 to 0.8 seconds for scroll
+                    time.sleep(0.5)  # Reduced from 0.8 to 0.5 seconds for scroll
                     
                     # Try clicking with JavaScript if regular click fails
                     try:
@@ -268,16 +268,16 @@ def scrape_psu_organizations():
                     click_count += 1
                     print(f"🔄 Clicked 'Load More' button #{click_count}")
                     
-                    # Wait for new content to load - more aggressive timing
-                    time.sleep(1.5)  # Reduced from 3 to 1.5 seconds - much faster
+                    # Wait for new content to load - ultra aggressive timing
+                    time.sleep(1.0)  # Reduced from 1.5 to 1.0 seconds - faster loading
                     
-                    # Wait for network activity to settle with faster checks
+                    # Wait for network activity to settle with minimal checks
                     wait_count = 0
-                    max_wait = 5  # Reduced from 8 to 5 for speed
+                    max_wait = 4  # Reduced from 5 to 4 for speed
                     last_count = current_count
                     
                     while wait_count < max_wait:
-                        time.sleep(0.5)  # Reduced from 0.8 to 0.5 second intervals
+                        time.sleep(0.4)  # Reduced from 0.5 to 0.4 second intervals
                         new_org_elements = driver.find_elements(By.CSS_SELECTOR, "a[href*='/organization/']")
                         new_count = len(new_org_elements)
                         
@@ -298,13 +298,13 @@ def scrape_psu_organizations():
                         consecutive_no_change += 1
                         print(f"⚠️  No new organizations loaded (attempt {consecutive_no_change})")
                         
-                        if consecutive_no_change >= 3:  # Reduced from 4 to 3 attempts for speed
+                        if consecutive_no_change >= 2:  # Reduced from 3 to 2 attempts for speed
                             print(f"✅ No more organizations to load after {consecutive_no_change} attempts. Final count: {final_count}")
                             break
                         
-                        # Shorter wait when no progress - prioritize speed
-                        print(f"⏳ Brief wait for slow loading...")
-                        time.sleep(2)  # Reduced from 4 to 2 seconds
+                        # Very brief wait when no progress - prioritize speed
+                        print(f"⏳ Quick wait for loading...")
+                        time.sleep(1.5)  # Reduced from 2 to 1.5 seconds
                     else:
                         # Reset consecutive failures if we got new content
                         consecutive_no_change = 0

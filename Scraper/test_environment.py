@@ -80,43 +80,6 @@ def test_chrome_minimal():
         print(f"  ❌ Chrome failed: {e}")
         return False
 
-def test_firefox_minimal():
-    """Test minimal Firefox setup."""
-    try:
-        print("🦊 Testing minimal Firefox...")
-        
-        from selenium import webdriver
-        from selenium.webdriver.firefox.options import Options
-        
-        firefox_options = Options()
-        firefox_options.add_argument('--headless')
-        
-        # Try to find Firefox binary
-        firefox_paths = ['/usr/bin/firefox', '/usr/bin/firefox-esr', '/snap/bin/firefox']
-        firefox_binary = None
-        for path in firefox_paths:
-            if os.path.exists(path):
-                firefox_binary = path
-                break
-                
-        if firefox_binary:
-            firefox_options.binary_location = firefox_binary
-            print(f"  Using Firefox binary: {firefox_binary}")
-        
-        driver = webdriver.Firefox(options=firefox_options)
-        driver.get('https://httpbin.org/get')
-        
-        # Get page title to confirm it works
-        title = driver.title
-        print(f"  ✅ Firefox working - Page title: {title}")
-        
-        driver.quit()
-        return True
-        
-    except Exception as e:
-        print(f"  ❌ Firefox failed: {e}")
-        return False
-
 def main():
     print("🧪 ENVIRONMENT TEST SCRIPT")
     print("=" * 50)
@@ -135,11 +98,8 @@ def main():
     # Test 1: Simple HTTP request
     results['requests'] = test_requests_simple()
     
-    # Test 2: Chrome
+    # Test 2: Chrome only (Firefox removed)
     results['chrome'] = test_chrome_minimal()
-    
-    # Test 3: Firefox  
-    results['firefox'] = test_firefox_minimal()
     
     # Summary
     print("\n" + "=" * 50)
@@ -155,14 +115,10 @@ def main():
     else:
         print("  ⚠️  HTTP requests failed - may need browser automation")
         
-    if results['firefox'] and not results['chrome']:
-        print("  ✅ Firefox works, Chrome doesn't - prefer Firefox")
-    elif results['chrome'] and not results['firefox']:
-        print("  ✅ Chrome works, Firefox doesn't - prefer Chrome")
-    elif results['firefox'] and results['chrome']:
-        print("  ✅ Both browsers work - Firefox tends to be more stable in CI")
+    if results['chrome']:
+        print("  ✅ Chrome works - using Chrome WebDriver")
     else:
-        print("  ❌ No browsers working - investigate browser installation")
+        print("  ❌ Chrome not working - investigate browser installation")
 
 if __name__ == "__main__":
     main() 
