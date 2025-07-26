@@ -66,12 +66,110 @@ const PORT = process.env.PORT || 5009;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-let hobbies = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "..", "src", "data", "hobbies.json")));
+// Load hobbies with fallback for missing file
+let hobbies;
+let actualHobbiesPath = path.join(__dirname, "..", "..", "..", "src", "data", "hobbies.json");
+try {
+  hobbies = JSON.parse(fs.readFileSync(actualHobbiesPath, 'utf8'));
+  console.log(`✅ Loaded ${hobbies.length} hobbies from ${actualHobbiesPath}`);
+} catch (error) {
+  console.log(`⚠️ Could not load hobbies from ${actualHobbiesPath}: ${error.message}`);
+  console.log(`🔍 Trying alternative paths...`);
+  
+  // Try alternative paths
+  const alternativePaths = [
+    path.join(__dirname, "..", "..", "src", "data", "hobbies.json"), // Original path
+    path.join(process.cwd(), "src", "data", "hobbies.json"), // From working directory
+    path.join(process.cwd(), "data", "hobbies.json"), // Direct from working directory
+    path.join(__dirname, "hobbies.json"), // In the same directory as the backend
+  ];
+  
+  let loaded = false;
+  for (const altPath of alternativePaths) {
+    try {
+      hobbies = JSON.parse(fs.readFileSync(altPath, 'utf8'));
+      console.log(`✅ Found hobbies at alternative path: ${altPath} (${hobbies.length} hobbies)`);
+      actualHobbiesPath = altPath; // Update to the working path
+      loaded = true;
+      break;
+    } catch {
+      console.log(`❌ Not found: ${altPath}`);
+    }
+  }
+  
+  if (!loaded) {
+    console.log(`🆕 No hobbies file found, creating default list...`);
+    hobbies = [
+      "Reading", "Writing", "Running", "Swimming", "Cooking", "Traveling", 
+      "Photography", "Music", "Dancing", "Hiking", "Gaming", "Painting",
+      "Yoga", "Tennis", "Basketball", "Soccer", "Golf", "Fishing"
+    ];
+    
+    // Try to create the file
+    try {
+      const dir = path.dirname(actualHobbiesPath);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(actualHobbiesPath, JSON.stringify(hobbies, null, 2));
+      console.log(`✅ Created default hobbies file at ${actualHobbiesPath}`);
+    } catch (writeError) {
+      console.log(`⚠️ Could not create hobbies file: ${writeError.message}`);
+    }
+  }
+}
 const hobbyVectorPath = path.join(__dirname, "openAI_hobby_vectors.json");
 let hobbyVectors = loadVectors(hobbyVectorPath);
 
 // ✅ ADD: Load trait vectors globally
-let traits = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "..", "src", "data", "traits.json")));
+// Load traits with fallback for missing file
+let traits;
+const traitsPath = path.join(__dirname, "..", "..", "..", "src", "data", "traits.json");
+try {
+  traits = JSON.parse(fs.readFileSync(traitsPath, 'utf8'));
+  console.log(`✅ Loaded ${traits.length} traits from ${traitsPath}`);
+} catch (error) {
+  console.log(`⚠️ Could not load traits from ${traitsPath}: ${error.message}`);
+  console.log(`🔍 Trying alternative paths for traits...`);
+  
+  // Try alternative paths
+  const alternativePaths = [
+    path.join(__dirname, "..", "..", "src", "data", "traits.json"), // Original path
+    path.join(process.cwd(), "src", "data", "traits.json"), // From working directory
+    path.join(process.cwd(), "data", "traits.json"), // Direct from working directory
+    path.join(__dirname, "traits.json"), // In the same directory as the backend
+  ];
+  
+  let loaded = false;
+  for (const altPath of alternativePaths) {
+    try {
+      traits = JSON.parse(fs.readFileSync(altPath, 'utf8'));
+      console.log(`✅ Found traits at alternative path: ${altPath} (${traits.length} traits)`);
+      loaded = true;
+      break;
+    } catch {
+      console.log(`❌ Not found: ${altPath}`);
+    }
+  }
+  
+  if (!loaded) {
+    console.log(`🆕 No traits file found, creating default list...`);
+    traits = [
+      "ambitious", "analytical", "articulate", "confident", "creative", "curious",
+      "dedicated", "driven", "empathetic", "enthusiastic", "flexible", "friendly",
+      "hardworking", "innovative", "intelligent", "kind", "motivated", "organized",
+      "passionate", "patient", "reliable", "resourceful", "responsible", "thoughtful"
+    ];
+    
+    // Try to create the file
+    try {
+      const dir = path.dirname(traitsPath);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(traitsPath, JSON.stringify(traits, null, 2));
+      console.log(`✅ Created default traits file at ${traitsPath}`);
+    } catch (writeError) {
+      console.log(`⚠️ Could not create traits file: ${writeError.message}`);
+    }
+  }
+}
 const traitVectorPath = path.join(__dirname, "openAI_trait_vectors.json");
 let traitVectors = loadVectors(traitVectorPath);
 
@@ -291,7 +389,7 @@ app.post("/api/hobbies/normalize", async (req, res) => {
     console.log(`🔍 Current working directory: ${process.cwd()}`);
     console.log(`🔍 __dirname is: ${__dirname}`);
     
-    const hobbiesFilePath = path.join(__dirname, "..", "..", "..", "src", "data", "hobbies.json");
+    const hobbiesFilePath = actualHobbiesPath; // Use the same path we found during loading
     console.log(`🔍 Calculated hobbies path: ${hobbiesFilePath}`);
     console.log(`🔍 Path exists before write: ${fs.existsSync(hobbiesFilePath)}`);
     
