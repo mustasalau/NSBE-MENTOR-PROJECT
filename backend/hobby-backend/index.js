@@ -71,7 +71,7 @@ const hobbyVectorPath = path.join(__dirname, "openAI_hobby_vectors.json");
 let hobbyVectors = loadVectors(hobbyVectorPath);
 
 // ✅ ADD: Load trait vectors globally
-const traits = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "src", "data", "traits.json")));
+let traits = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "src", "data", "traits.json")));
 const traitVectorPath = path.join(__dirname, "openAI_trait_vectors.json");
 let traitVectors = loadVectors(traitVectorPath);
 
@@ -309,6 +309,10 @@ app.get("/api/hobbies/vectors", (req, res) => {
 
 app.get("/api/hobbies", (req, res) => {
   res.json(hobbies);
+});
+
+app.get("/api/traits", (req, res) => {
+  res.json(traits);
 });
 
 // Test endpoint for text vectorization
