@@ -75,16 +75,20 @@ console.log(`🔍 Debug: process.cwd() = ${process.cwd()}`);
 
 // CORRECTED: Try paths in order of most likely to work
 const candidatePaths = [
-  // In production: /opt/render/project/src/backend/hobby-backend -> /opt/render/project/src/data/hobbies.json  
-  path.join(__dirname, "..", "..", "data", "hobbies.json"), // From backend up 2 levels to project/src/data
+  // PRIMARY: Production path from backend directory to project root then src/data
+  // /opt/render/project/src/backend/hobby-backend -> /opt/render/project/src/data/hobbies.json
+  path.join(__dirname, "..", "..", "data", "hobbies.json"), 
   
-  // From working directory (if process.cwd() is /opt/render/project/src/)
-  path.join(process.cwd(), "data", "hobbies.json"), 
+  // ALTERNATIVE: From project root (if working directory is different)
+  path.join(process.cwd(), "src", "data", "hobbies.json"),
   
-  // From working directory up one level (if process.cwd() is /opt/render/project/src/backend/hobby-backend)
-  path.join(process.cwd(), "..", "..", "data", "hobbies.json"),
+  // ALTERNATIVE: From backend working directory up to project root
+  path.join(process.cwd(), "..", "..", "..", "src", "data", "hobbies.json"),
   
-  // Original path that was causing double-src (LAST RESORT)
+  // FALLBACK: Direct from working directory (in case structure is flatter)
+  path.join(process.cwd(), "data", "hobbies.json"),
+  
+  // LAST RESORT: The old double-src path (shouldn't be needed)
   path.join(__dirname, "..", "..", "..", "src", "data", "hobbies.json"),
 ];
 
@@ -105,15 +109,39 @@ for (let i = 0; i < candidatePaths.length; i++) {
 }
 
 if (!loaded) {
-  console.log(`🆕 No hobbies file found at any path, creating default list...`);
+  console.log(`🆕 No hobbies file found at any path, creating with REAL data...`);
   
   // Default to the most likely correct path for creation
   actualHobbiesPath = path.join(__dirname, "..", "..", "data", "hobbies.json");
   
+  // Use REAL hobby data (not just defaults) - this matches your local src/data/hobbies.json
   hobbies = [
-    "Reading", "Writing", "Running", "Swimming", "Cooking", "Traveling", 
-    "Photography", "Music", "Dancing", "Hiking", "Gaming", "Painting",
-    "Yoga", "Tennis", "Basketball", "Soccer", "Golf", "Fishing"
+    "Reading", "Writing", "Running", "Swimming", "Cooking", "Traveling", "Photography", "Music", "Dancing", "Hiking",
+    "Gaming", "Painting", "Yoga", "Tennis", "Basketball", "Soccer", "Golf", "Fishing", "Gardening", "Knitting",
+    "Baking", "Cycling", "Jogging", "Weightlifting", "Rock climbing", "Skiing", "Snowboarding", "Surfing", "Kayaking", "Canoeing",
+    "Sailing", "Scuba diving", "Snorkeling", "Horse riding", "Martial arts", "Boxing", "Wrestling", "Fencing", "Archery", "Shooting",
+    "Hunting", "Camping", "Backpacking", "Bird watching", "Astronomy", "Chess", "Poker", "Bridge", "Scrabble", "Crosswords",
+    "Sudoku", "Jigsaw puzzles", "Board games", "Video games", "Computer programming", "Web design", "Graphic design", "Interior design",
+    "Fashion design", "Jewelry making", "Pottery", "Sculpture", "Woodworking", "Metalworking", "Electronics", "Robotics", "3D printing",
+    "Model building", "RC vehicles", "Drones", "Magic tricks", "Juggling", "Stand-up comedy", "Acting", "Theater", "Film making",
+    "Screenwriting", "Blogging", "Journalism", "Creative writing", "Poetry", "Calligraphy", "Origami", "Scrapbooking", "Collecting",
+    "Antiques", "Coins", "Stamps", "Comic books", "Action figures", "Vintage items", "Wine tasting", "Beer brewing", "Coffee roasting",
+    "Tea ceremony", "Meditation", "Mindfulness", "Volunteering", "Community service", "Teaching", "Tutoring", "Mentoring", "Public speaking",
+    "Debate", "Language learning", "Travel planning", "Cultural exploration", "Museum visits", "Art galleries", "Concerts", "Festivals",
+    "Opera", "Ballet", "Broadway shows", "Live sports", "Trivia nights", "Karaoke", "Bowling", "Pool", "Darts", "Ping pong",
+    "Badminton", "Volleyball", "Baseball", "Softball", "Football", "Rugby", "Cricket", "Hockey", "Lacrosse", "Ultimate frisbee",
+    "Frisbee golf", "Disc golf", "Geocaching", "Orienteering", "Parkour", "Skateboarding", "Longboarding", "Rollerblading", "Ice skating",
+    "Figure skating", "Speed skating", "Curling", "Bobsledding", "Luge", "Skeleton", "Sledding", "Tobogganing", "Cross-country skiing",
+    "Alpine skiing", "Freestyle skiing", "Ski jumping", "Snowmobiling", "Ice fishing", "Fly fishing", "Deep sea fishing", "Angling",
+    "Crabbing", "Clamming", "Foraging", "Mushroom hunting", "Berry picking", "Beekeeping", "Chicken keeping", "Rabbit breeding", "Dog training",
+    "Cat grooming", "Pet photography", "Wildlife photography", "Landscape photography", "Portrait photography", "Street photography", "Macro photography",
+    "Drone photography", "Film photography", "Digital photography", "Photo editing", "Video editing", "Animation", "Stop motion", "Time lapse",
+    "Documentary making", "Podcast creation", "Audio production", "Music production", "Songwriting", "Composing", "Singing", "Voice acting",
+    "Instrument playing", "Guitar", "Piano", "Violin", "Drums", "Bass", "Saxophone", "Trumpet", "Flute", "Clarinet",
+    "Harmonica", "Ukulele", "Banjo", "Mandolin", "Harp", "Cello", "Double bass", "Tuba", "French horn", "Trombone",
+    "Oboe", "Bassoon", "Recorder", "Didgeridoo", "Bongos", "Congas", "Djembe", "Tabla", "Xylophone", "Marimba",
+    "Vibraphone", "Glockenspiel", "Timpani", "Cymbals", "Triangle", "Tambourine", "Castanets", "Maracas", "Claves", "Cowbell",
+    "Netflix", "Hulu", "Amazon Prime", "Disney Plus", "HBO Max", "Peacock", "Paramount Plus", "Apple TV Plus", "Crunchyroll", "Funimation"
   ];
   
   // Try to create the file
@@ -122,7 +150,7 @@ if (!loaded) {
     console.log(`🔍 Creating directory: ${dir}`);
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(actualHobbiesPath, JSON.stringify(hobbies, null, 2));
-    console.log(`✅ Created default hobbies file at ${actualHobbiesPath}`);
+    console.log(`✅ Created REAL hobbies file with ${hobbies.length} hobbies at ${actualHobbiesPath}`);
   } catch (writeError) {
     console.log(`⚠️ Could not create hobbies file: ${writeError.message}`);
   }
@@ -142,16 +170,20 @@ console.log(`🔍 Debug traits: process.cwd() = ${process.cwd()}`);
 
 // CORRECTED: Try paths in order of most likely to work
 const traitCandidatePaths = [
-  // In production: /opt/render/project/src/backend/hobby-backend -> /opt/render/project/src/data/traits.json  
-  path.join(__dirname, "..", "..", "data", "traits.json"), // From backend up 2 levels to project/src/data
+  // PRIMARY: Production path from backend directory to project root then src/data
+  // /opt/render/project/src/backend/hobby-backend -> /opt/render/project/src/data/traits.json
+  path.join(__dirname, "..", "..", "data", "traits.json"),
   
-  // From working directory (if process.cwd() is /opt/render/project/src/)
-  path.join(process.cwd(), "data", "traits.json"), 
+  // ALTERNATIVE: From project root (if working directory is different)
+  path.join(process.cwd(), "src", "data", "traits.json"),
   
-  // From working directory up one level (if process.cwd() is /opt/render/project/src/backend/hobby-backend)
-  path.join(process.cwd(), "..", "..", "data", "traits.json"),
+  // ALTERNATIVE: From backend working directory up to project root
+  path.join(process.cwd(), "..", "..", "..", "src", "data", "traits.json"),
   
-  // Original path that was causing double-src (LAST RESORT)
+  // FALLBACK: Direct from working directory (in case structure is flatter)
+  path.join(process.cwd(), "data", "traits.json"),
+  
+  // LAST RESORT: The old double-src path (shouldn't be needed)
   path.join(__dirname, "..", "..", "..", "src", "data", "traits.json"),
 ];
 
