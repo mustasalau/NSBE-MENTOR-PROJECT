@@ -75,6 +75,9 @@ console.log(`🔍 Debug: process.cwd() = ${process.cwd()}`);
 
 // CORRECTED: Try paths in order of most likely to work
 const candidatePaths = [
+  // FIRST: Local backend data directory (copied during postinstall)
+  path.join(__dirname, "data", "hobbies.json"),
+  
   // PRIMARY: Production path from backend directory to project root then src/data
   // /opt/render/project/src/backend/hobby-backend -> /opt/render/project/src/data/hobbies.json
   path.join(__dirname, "..", "..", "data", "hobbies.json"), 
@@ -111,8 +114,8 @@ for (let i = 0; i < candidatePaths.length; i++) {
 if (!loaded) {
   console.log(`🆕 No hobbies file found at any path, creating with REAL data...`);
   
-  // Default to the most likely correct path for creation
-  actualHobbiesPath = path.join(__dirname, "..", "..", "data", "hobbies.json");
+  // Default to the local backend data directory for creation
+  actualHobbiesPath = path.join(__dirname, "data", "hobbies.json");
   
   // Use REAL hobby data (not just defaults) - this matches your local src/data/hobbies.json
   hobbies = [
@@ -170,6 +173,9 @@ console.log(`🔍 Debug traits: process.cwd() = ${process.cwd()}`);
 
 // CORRECTED: Try paths in order of most likely to work
 const traitCandidatePaths = [
+  // FIRST: Local backend data directory (copied during postinstall)
+  path.join(__dirname, "data", "traits.json"),
+  
   // PRIMARY: Production path from backend directory to project root then src/data
   // /opt/render/project/src/backend/hobby-backend -> /opt/render/project/src/data/traits.json
   path.join(__dirname, "..", "..", "data", "traits.json"),
@@ -206,8 +212,8 @@ for (let i = 0; i < traitCandidatePaths.length; i++) {
 if (!traitsLoaded) {
   console.log(`🆕 No traits file found at any path, creating default list...`);
   
-  // Default to the most likely correct path for creation
-  actualTraitsPath = path.join(__dirname, "..", "..", "data", "traits.json");
+  // Default to the local backend data directory for creation
+  actualTraitsPath = path.join(__dirname, "data", "traits.json");
   
   traits = [
     "ambitious", "analytical", "articulate", "confident", "creative", "curious",
