@@ -48,13 +48,29 @@ jobs:
           sudo apt-get install -y firefox
           
           # Install GeckoDriver manually (firefox-geckodriver package doesn't exist)
-          GECKODRIVER_VERSION=$(curl -s https://api.github.com/repos/mozilla/geckodriver/releases/latest | grep '"tag_name"' | cut -d '"' -f 4)
+          echo "Getting GeckoDriver latest version..."
+          GECKODRIVER_VERSION=$(curl -s https://api.github.com/repos/mozilla/geckodriver/releases/latest | grep '"tag_name"' | sed -E 's/.*"tag_name": "([^"]+)".*/\1/')
+          
+          # Fallback to a known working version if API fails
+          if [[ -z "$GECKODRIVER_VERSION" || "$GECKODRIVER_VERSION" == *"api.github.com"* ]]; then
+            echo "API failed, using fallback version v0.36.0"
+            GECKODRIVER_VERSION="v0.36.0"
+          fi
+          
           echo "Installing GeckoDriver version: $GECKODRIVER_VERSION"
-          wget -q https://github.com/mozilla/geckodriver/releases/download/$GECKODRIVER_VERSION/geckodriver-$GECKODRIVER_VERSION-linux64.tar.gz
-          tar -xzf geckodriver-$GECKODRIVER_VERSION-linux64.tar.gz
-          sudo mv geckodriver /usr/local/bin/
-          sudo chmod +x /usr/local/bin/geckodriver
-          rm geckodriver-$GECKODRIVER_VERSION-linux64.tar.gz
+          
+          # Download and install
+          wget -q "https://github.com/mozilla/geckodriver/releases/download/$GECKODRIVER_VERSION/geckodriver-$GECKODRIVER_VERSION-linux64.tar.gz"
+          
+          if [[ $? -eq 0 ]]; then
+            tar -xzf "geckodriver-$GECKODRIVER_VERSION-linux64.tar.gz"
+            sudo mv geckodriver /usr/local/bin/
+            sudo chmod +x /usr/local/bin/geckodriver
+            rm "geckodriver-$GECKODRIVER_VERSION-linux64.tar.gz"
+            echo "✅ GeckoDriver installed successfully"
+          else
+            echo "❌ GeckoDriver download failed, continuing without it"
+          fi
           
           echo "✅ Browser installation complete"
           
