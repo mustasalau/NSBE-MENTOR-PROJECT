@@ -418,18 +418,26 @@ def scrape_psu_organizations():
         
         # Click "Load More" button repeatedly until all organizations are loaded
         click_count = 0
-        max_clicks = 150  # Increased to handle all organizations
+        max_clicks = 200  # Increased from 150 to 200 to ensure we can get all orgs
         consecutive_no_change = 0
         target_count = 1212
+        start_time = time.time()  # Track timing to avoid timeout
         
         print(f"🎯 Starting Load More clicking - Target: {target_count}+ organizations")
+        print(f"⏱️ Starting at {time.strftime('%H:%M:%S')} - Max time: 4.5 minutes")
         
         while click_count < max_clicks:
+            # Check if we're approaching timeout (4.5 minutes = 270 seconds)
+            elapsed_time = time.time() - start_time
+            if elapsed_time > 270:
+                print(f"⏰ Approaching timeout after {elapsed_time:.1f}s, stopping with {len(driver.find_elements(By.CSS_SELECTOR, 'a[href*=\"/organization/\"]'))} organizations")
+                break
+            
             # Count current organizations
             org_elements = driver.find_elements(By.CSS_SELECTOR, "a[href*='/organization/']")
             current_count = len(org_elements)
             
-            print(f"📊 Currently loaded: {current_count} organizations (Click #{click_count})")
+            print(f"📊 Currently loaded: {current_count} organizations (Click #{click_count}, {elapsed_time:.1f}s elapsed)")
             
             # Check if we've reached our target
             if current_count >= target_count:
@@ -464,7 +472,7 @@ def scrape_psu_organizations():
                 try:
                     # Scroll to the button and wait
                     driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", load_more_button)
-                    time.sleep(3)  # Increased to 3 seconds for scroll
+                    time.sleep(1.5)  # Reduced from 3 to 1.5 seconds for scroll
                     
                     # Try clicking with JavaScript if regular click fails
                     try:
@@ -475,16 +483,16 @@ def scrape_psu_organizations():
                     click_count += 1
                     print(f"🔄 Clicked 'Load More' button #{click_count}")
                     
-                    # Wait for new content to load - increased significantly
-                    time.sleep(8)  # Increased from 4 to 8 seconds - much more time for JS
+                    # Wait for new content to load - balanced timing
+                    time.sleep(3)  # Reduced from 8 to 3 seconds - still patient but not too slow
                     
-                    # Wait for network activity to settle with much longer waits
+                    # Wait for network activity to settle with balanced waits
                     wait_count = 0
-                    max_wait = 15  # Increased from 12 to 15
+                    max_wait = 8  # Reduced from 15 to 8 for efficiency
                     last_count = current_count
                     
                     while wait_count < max_wait:
-                        time.sleep(1.5)  # Increased to 1.5 second intervals
+                        time.sleep(0.8)  # Reduced from 1.5 to 0.8 second intervals
                         new_org_elements = driver.find_elements(By.CSS_SELECTOR, "a[href*='/organization/']")
                         new_count = len(new_org_elements)
                         
@@ -505,13 +513,13 @@ def scrape_psu_organizations():
                         consecutive_no_change += 1
                         print(f"⚠️  No new organizations loaded (attempt {consecutive_no_change})")
                         
-                        if consecutive_no_change >= 5:  # Increased from 3 to 5 attempts
+                        if consecutive_no_change >= 4:  # Reduced from 5 to 4 attempts for efficiency
                             print(f"✅ No more organizations to load after {consecutive_no_change} attempts. Final count: {final_count}")
                             break
                         
-                        # Longer wait only when no progress - give much more time for slow loading
+                        # Longer wait only when no progress - balanced timing
                         print(f"⏳ Waiting extra time for potential slow loading...")
-                        time.sleep(10)  # Increased from 6 to 10 seconds
+                        time.sleep(4)  # Reduced from 10 to 4 seconds
                     else:
                         # Reset consecutive failures if we got new content
                         consecutive_no_change = 0
