@@ -12,22 +12,19 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options as ChromeOptions
-from selenium.webdriver.firefox.options import Options as FirefoxOptions
 from selenium.webdriver.chrome.service import Service as ChromeService
-from selenium.webdriver.firefox.service import Service as FirefoxService
 from selenium.common.exceptions import TimeoutException, WebDriverException, NoSuchElementException
 from webdriver_manager.chrome import ChromeDriverManager
-from webdriver_manager.firefox import GeckoDriverManager
 
 def cleanup_browser_processes():
-    """Kill any existing browser processes that might be interfering."""
+    """Kill any existing Chrome processes that might be interfering."""
     try:
         import subprocess
-        # Kill any existing browser processes
-        for process_name in ['chrome', 'chromium', 'chromium-browser', 'firefox', 'geckodriver']:
+        # Kill any existing Chrome/Chromium processes
+        for process_name in ['chrome', 'chromium', 'chromium-browser']:
             try:
                 subprocess.run(['pkill', '-f', process_name], 
-                             capture_output=True, timeout=10)
+                             capture_output=True, timeout=5)  # Reduced timeout
             except:
                 pass
         
@@ -36,9 +33,7 @@ def cleanup_browser_processes():
             '/tmp/.com.google.Chrome.*',
             '/tmp/.org.chromium.Chromium.*',
             '/tmp/chrome_*',
-            '/dev/shm/chrome_*',
-            '/tmp/firefox_*',
-            '/tmp/rust_mozprofile*'
+            '/dev/shm/chrome_*'
         ]
         
         for pattern in lock_patterns:
@@ -51,179 +46,24 @@ def cleanup_browser_processes():
                 except:
                     pass
         
-        print("🧹 Cleaned up any existing browser processes and lock files")
+        print("🧹 Cleaned up Chrome processes and lock files")
     except:
         pass
 
-def try_requests_approach():
-    """Try to scrape using requests library without browser automation."""
-    print("🌐 Attempting requests-based approach (no browser)...")
-    
-    try:
-        # Try to get the page with requests
-        url = 'https://discover.psu.edu/organizations'
-        
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'Accept-Encoding': 'gzip, deflate',
-            'Connection': 'keep-alive',
-        }
-        
-        print(f"📡 Making request to: {url}")
-        response = requests.get(url, headers=headers, timeout=30)
-        
-        if response.status_code == 200:
-            print(f"✅ Got response ({len(response.text)} chars)")
-            
-            # Look for organization links in the HTML
-            import re
-            
-            # Try to find organization links
-            org_links = re.findall(r'href="[^"]*?/organization/([^"]*?)"', response.text)
-            
-            if org_links:
-                print(f"🎯 Found {len(org_links)} organization links in static HTML")
-                
-                organizations = []
-                for i, org_slug in enumerate(set(org_links)):  # Remove duplicates
-                    if org_slug:
-                        # Convert slug to readable name
-                        name = org_slug.replace('-', ' ').title()
-                        organizations.append({
-                            'name': clean_organization_name(name),
-                            'acronyms': []
-                        })
-                        
-                        if (i + 1) % 50 == 0:
-                            print(f"📊 Processed {i + 1} organizations...")
-                
-                print(f"✅ Extracted {len(organizations)} organizations using requests approach")
-                return organizations
-            else:
-                print("❌ No organization links found in static HTML - site likely uses JavaScript")
-                return None
-        else:
-            print(f"❌ HTTP {response.status_code} - {response.reason}")
-            return None
-            
-    except Exception as e:
-        print(f"❌ Requests approach failed: {e}")
-        return None
-
-def setup_firefox_driver():
-    """Set up Firefox WebDriver as an alternative to Chrome."""
-    print("🦊 Attempting Firefox WebDriver setup...")
-    
-    try:
-        firefox_options = FirefoxOptions()
-        firefox_options.add_argument('--headless')
-        firefox_options.add_argument('--no-sandbox')
-        firefox_options.add_argument('--disable-dev-shm-usage')
-        firefox_options.add_argument('--disable-gpu')
-        firefox_options.add_argument('--window-size=1920,1080')
-        
-        # Detect if running in CI environment
-        is_ci = os.environ.get('CI') or os.environ.get('GITHUB_ACTIONS')
-        
-        if is_ci:
-            print("🤖 CI mode - using system Firefox")
-            
-            # In CI, try different Firefox approaches
-            firefox_approaches = [
-                {
-                    'name': 'System Firefox with profile',
-                    'binary': '/usr/bin/firefox',
-                    'use_profile': True
-                },
-                {
-                    'name': 'Snap Firefox',
-                    'binary': '/snap/bin/firefox', 
-                    'use_profile': True
-                },
-                {
-                    'name': 'System Firefox minimal',
-                    'binary': '/usr/bin/firefox',
-                    'use_profile': False
-                },
-                {
-                    'name': 'Auto-detect Firefox',
-                    'binary': None,
-                    'use_profile': False
-                }
-            ]
-            
-            for i, approach in enumerate(firefox_approaches, 1):
-                try:
-                    print(f"  🔄 Firefox attempt {i}: {approach['name']}")
-                    
-                    # Create fresh options for each attempt
-                    opts = FirefoxOptions()
-                    opts.add_argument('--headless')
-                    opts.add_argument('--no-sandbox')
-                    opts.add_argument('--disable-dev-shm-usage')
-                    opts.add_argument('--window-size=1920,1080')
-                    
-                    # Set binary if specified
-                    if approach['binary'] and os.path.exists(approach['binary']):
-                        opts.binary_location = approach['binary']
-                        print(f"    Using Firefox binary: {approach['binary']}")
-                    
-                    # Set profile if needed
-                    if approach['use_profile']:
-                        profile_dir = f"/tmp/firefox_profile_{os.getpid()}_{int(time.time())}"
-                        opts.add_argument(f'--profile={profile_dir}')
-                        print(f"    Using profile: {profile_dir}")
-                    
-                    # Try to create driver
-                    driver = webdriver.Firefox(options=opts)
-                    print(f"  ✅ Firefox approach {i} successful!")
-                    return driver
-                    
-                except Exception as e:
-                    print(f"  ❌ Firefox approach {i} failed: {e}")
-                    continue
-            
-            print("❌ All Firefox approaches failed")
-            return None
-        else:
-            print("💻 Local mode - using webdriver-manager for Firefox")
-            service = FirefoxService(GeckoDriverManager().install())
-            driver = webdriver.Firefox(service=service, options=firefox_options)
-            print("✅ Firefox WebDriver initialized successfully")
-            return driver
-        
-    except Exception as e:
-        print(f"❌ Firefox setup failed: {e}")
-        return None
-
 def setup_driver():
-    """Set up WebDriver with multiple fallback strategies."""
+    """Set up Chrome WebDriver with optimized configuration for CI."""
     # Detect if running in CI environment
     is_ci = os.environ.get('CI') or os.environ.get('GITHUB_ACTIONS')
     
     if is_ci:
-        print("🤖 Running in CI mode - trying multiple browser strategies")
+        print("🤖 Running in CI mode - using optimized Chrome configuration")
         
         # Clean up any existing processes first
         cleanup_browser_processes()
-        time.sleep(2)
+        time.sleep(1)  # Reduced cleanup wait
         
-        # Strategy 1: Try requests-based approach (no browser needed)
-        print("\n🔄 Strategy 1: Requests-based scraping")
-        organizations = try_requests_approach()
-        if organizations:
-            return "requests_success", organizations
-        
-        # Strategy 2: Try Firefox
-        print("\n🔄 Strategy 2: Firefox WebDriver")
-        driver = setup_firefox_driver()
-        if driver:
-            return driver, None
-        
-        # Strategy 3: Try Chrome with completely different approach
-        print("\n🔄 Strategy 3: Chrome with temp directory override")
+        # Strategy: Optimized Chrome (Firefox removed based on environment test)
+        print("🌎 Using Chrome WebDriver (Firefox removed - not working in CI)")
         try:
             chrome_options = ChromeOptions()
             chrome_options.add_argument('--headless')
@@ -246,74 +86,29 @@ def setup_driver():
             # Ensure directory doesn't exist and create it
             if os.path.exists(temp_user_data):
                 shutil.rmtree(temp_user_data, ignore_errors=True)
-                time.sleep(0.5)
+                time.sleep(0.2)  # Reduced wait
             
             os.makedirs(temp_user_data, mode=0o755)
             chrome_options.add_argument(f'--user-data-dir={temp_user_data}')
-            print(f"  Using unique temp directory: {temp_user_data}")
+            print(f"  Using temp directory: {temp_user_data}")
             
-            # Try different Chrome binaries based on debug info
-            chrome_binaries = ['/snap/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome']
-            
-            for chrome_binary in chrome_binaries:
-                if os.path.exists(chrome_binary):
-                    try:
-                        print(f"  🔍 Trying Chrome binary: {chrome_binary}")
-                        chrome_options.binary_location = chrome_binary
-                        
-                        driver = webdriver.Chrome(options=chrome_options)
-                        print(f"  ✅ Chrome successful with {chrome_binary}")
-                        
-                        # Store cleanup info
-                        setup_driver.cleanup_dir = temp_user_data
-                        return driver, None
-                        
-                    except Exception as e:
-                        print(f"  ❌ Chrome failed with {chrome_binary}: {e}")
-                        continue
-            
-            # Cleanup temp directory if all failed
-            if os.path.exists(temp_user_data):
-                shutil.rmtree(temp_user_data, ignore_errors=True)
-                
-        except Exception as e:
-            print(f"❌ Chrome strategy failed: {e}")
-        
-        # Strategy 4: Try Chrome without user data directory at all
-        print("\n🔄 Strategy 4: Chrome without user data directory")
-        try:
-            chrome_options = ChromeOptions()
-            chrome_options.add_argument('--headless')
-            chrome_options.add_argument('--no-sandbox')
-            chrome_options.add_argument('--disable-dev-shm-usage')
-            chrome_options.add_argument('--disable-gpu')
-            chrome_options.add_argument('--window-size=1920,1080')
-            chrome_options.add_argument('--incognito')
-            chrome_options.add_argument('--no-first-run')
-            chrome_options.add_argument('--disable-extensions')
-            chrome_options.add_argument('--disable-plugins')
-            chrome_options.add_argument('--disable-default-apps')
-            chrome_options.add_argument('--disable-sync')
-            chrome_options.add_argument('--disable-background-networking')
-            # Try to disable user data directory entirely
-            chrome_options.add_argument('--disable-features=UserDataDir')
-            chrome_options.add_argument('--disable-features=ProfileManagement')
-            
-            # Use /snap/bin/chromium which worked in debug
-            chrome_options.binary_location = '/snap/bin/chromium'
+            # Use Chrome binary that works in CI (based on environment test)
+            chrome_options.binary_location = '/usr/bin/chromium-browser'
+            print(f"  Using Chrome binary: /usr/bin/chromium-browser")
             
             driver = webdriver.Chrome(options=chrome_options)
-            print("  ✅ Chrome without user data directory successful!")
+            print(f"  ✅ Chrome WebDriver initialized successfully")
+            
+            # Store cleanup info
+            setup_driver.cleanup_dir = temp_user_data
             return driver, None
             
         except Exception as e:
-            print(f"  ❌ Chrome without user data directory failed: {e}")
+            print(f"❌ Chrome setup failed: {e}")
+            return None, None
         
-        print("❌ All CI strategies failed")
-        return None, None
-    
     else:
-        # Local development - try Chrome first, then Firefox
+        # Local development - use Chrome
         print("💻 Running in local mode")
         
         try:
@@ -328,13 +123,8 @@ def setup_driver():
             print("✅ Local Chrome WebDriver initialized successfully")
             return driver, None
         except Exception as e:
-            print(f"❌ Local Chrome failed: {e}, trying Firefox...")
-            driver = setup_firefox_driver()
-            if driver:
-                return driver, None
-            else:
-                print(f"❌ Both Chrome and Firefox failed in local mode")
-                return None, None
+            print(f"❌ Local Chrome failed: {e}")
+            return None, None
 
 def clean_organization_name(name):
     """Clean organization name by removing common suffixes."""
@@ -358,23 +148,17 @@ def clean_organization_name(name):
 
 def scrape_psu_organizations():
     """
-    Scrape Penn State organizations using multiple fallback strategies.
+    Scrape Penn State organizations using optimized Chrome WebDriver.
     """
     url = 'https://discover.psu.edu/organizations'
     
     result = setup_driver()
     if not result or result[0] is None:
-        print("❌ Could not initialize any web driver or scraping method")
+        print("❌ Could not initialize Chrome WebDriver")
         return []
     
-    driver, organizations = result
+    driver, _ = result  # No organizations from requests approach
     
-    # If we got organizations from requests approach, return them
-    if driver == "requests_success" and organizations:
-        print(f"✅ Successfully scraped {len(organizations)} organizations using requests approach")
-        return organizations
-    
-    # Otherwise, use Selenium with the initialized driver
     organizations = []
     
     try:
@@ -606,7 +390,7 @@ def scrape_psu_organizations():
     except Exception as e:
         print(f"❌ Unexpected error: {e}")
     finally:
-        if driver and driver != "requests_success":
+        if driver:
             driver.quit()
             print("🔒 Browser closed")
             
