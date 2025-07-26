@@ -20,7 +20,7 @@ const __dirname = path.dirname(__filename);
 // Paths
 const traitVectorPath = path.join(__dirname, "openAI_trait_vectors.json");
 let traitVectors = loadVectors(traitVectorPath);
-const traitsPath = path.join(__dirname, "..", "..", "src", "data", "traits.json");
+const traitsPath = path.join(__dirname, "..", "..", "..", "src", "data", "traits.json");
 
 let staticTraits = [];
 try {

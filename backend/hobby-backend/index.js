@@ -66,12 +66,12 @@ const PORT = process.env.PORT || 5009;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-let hobbies = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "src", "data", "hobbies.json")));
+let hobbies = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "..", "src", "data", "hobbies.json")));
 const hobbyVectorPath = path.join(__dirname, "openAI_hobby_vectors.json");
 let hobbyVectors = loadVectors(hobbyVectorPath);
 
 // ✅ ADD: Load trait vectors globally
-let traits = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "src", "data", "traits.json")));
+let traits = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "..", "src", "data", "traits.json")));
 const traitVectorPath = path.join(__dirname, "openAI_trait_vectors.json");
 let traitVectors = loadVectors(traitVectorPath);
 
@@ -291,7 +291,7 @@ app.post("/api/hobbies/normalize", async (req, res) => {
     console.log(`🔍 Current working directory: ${process.cwd()}`);
     console.log(`🔍 __dirname is: ${__dirname}`);
     
-    const hobbiesFilePath = path.join(__dirname, "..", "..", "src", "data", "hobbies.json");
+    const hobbiesFilePath = path.join(__dirname, "..", "..", "..", "src", "data", "hobbies.json");
     console.log(`🔍 Calculated hobbies path: ${hobbiesFilePath}`);
     console.log(`🔍 Path exists before write: ${fs.existsSync(hobbiesFilePath)}`);
     
@@ -2166,7 +2166,7 @@ app.get('/api/test/trait-vectors', async (req, res) => {
     debugLog('\n=== TRAIT VECTOR COMPARISON TEST ===\n');
     
     // 1. Load static traits list
-    const staticTraits = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "src", "data", "traits.json")));
+    const staticTraits = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "..", "src", "data", "traits.json")));
     debugLog(`📋 Static traits count: ${staticTraits.length}`);
     debugLog(`📋 First 5 static traits:`, staticTraits.slice(0, 5));
     
