@@ -15,7 +15,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.common.exceptions import TimeoutException, WebDriverException
 from webdriver_manager.chrome import ChromeDriverManager
 
-def cleanup_chrome_processes():
+def cleanup_browser_processes():
     """Kill any existing Chrome processes that might be interfering."""
     try:
         import subprocess
@@ -23,7 +23,7 @@ def cleanup_chrome_processes():
         for process_name in ['chrome', 'chromium', 'chromium-browser']:
             try:
                 subprocess.run(['pkill', '-f', process_name], 
-                             capture_output=True, timeout=10)
+                             capture_output=True, timeout=5)  # Reduced timeout
             except:
                 pass
         
@@ -45,222 +45,83 @@ def cleanup_chrome_processes():
                 except:
                     pass
         
-        print("🧹 Cleaned up any existing Chrome processes and lock files")
+        print("🧹 Cleaned up Chrome processes and lock files")
     except:
         pass
 
 def setup_driver():
-    """Set up Chrome WebDriver with appropriate options."""
+    """Set up Chrome WebDriver with optimized configuration for CI."""
     # Detect if running in CI environment
     is_ci = os.environ.get('CI') or os.environ.get('GITHUB_ACTIONS')
     
     if is_ci:
-        print("🤖 Running in CI mode - using ultra-aggressive stateless configuration")
+        print("🤖 Running in CI mode - using optimized Chrome configuration")
         
-        # Clean up any existing Chrome processes first
-        cleanup_chrome_processes()
+        # Clean up any existing processes first
+        cleanup_browser_processes()
+        time.sleep(1)  # Reduced cleanup wait
         
-        # Wait a moment for cleanup to complete
-        time.sleep(3)
+        # Strategy: Optimized Chrome (Firefox removed based on environment test)
+        print("🌎 Using Chrome WebDriver (Firefox removed - not working in CI)")
+        try:
+            chrome_options = Options()
+            chrome_options.add_argument('--headless')
+            chrome_options.add_argument('--no-sandbox')
+            chrome_options.add_argument('--disable-dev-shm-usage')
+            chrome_options.add_argument('--disable-gpu')
+            chrome_options.add_argument('--single-process')
+            chrome_options.add_argument('--no-zygote')
+            chrome_options.add_argument('--window-size=1920,1080')
+            chrome_options.add_argument('--disable-extensions')
+            chrome_options.add_argument('--disable-plugins')
+            chrome_options.add_argument('--no-first-run')
+            chrome_options.add_argument('--disable-default-apps')
+            
+            # Create a completely unique user data directory in /tmp
+            unique_id = str(uuid.uuid4())
+            temp_user_data = f"/tmp/chrome_ci_{unique_id}_{int(time.time() * 1000000)}"
+            
+            # Ensure directory doesn't exist and create it
+            if os.path.exists(temp_user_data):
+                shutil.rmtree(temp_user_data, ignore_errors=True)
+                time.sleep(0.2)  # Reduced wait
+            
+            os.makedirs(temp_user_data, mode=0o755)
+            chrome_options.add_argument(f'--user-data-dir={temp_user_data}')
+            print(f"  Using temp directory: {temp_user_data}")
+            
+            # Use Chrome binary that works in CI (based on environment test)
+            chrome_options.binary_location = '/usr/bin/chromium-browser'
+            print(f"  Using Chrome binary: /usr/bin/chromium-browser")
+            
+            driver = webdriver.Chrome(options=chrome_options)
+            print(f"  ✅ Chrome WebDriver initialized successfully")
+            
+            # Store cleanup info
+            setup_driver.cleanup_dir = temp_user_data
+            return driver
+            
+        except Exception as e:
+            print(f"❌ Chrome setup failed: {e}")
+            return None
         
-        # Find Chrome binary
-        chrome_paths = [
-            '/snap/bin/chromium',
-            '/usr/bin/chromium-browser',
-            '/opt/google/chrome/google-chrome',
-            '/usr/bin/google-chrome',
-            '/usr/bin/google-chrome-stable',
-        ]
-        
-        chrome_binary = None
-        for path in chrome_paths:
-            if os.path.exists(path) and os.access(path, os.X_OK):
-                chrome_binary = path
-                print(f"🔍 Found Chrome binary: {chrome_binary}")
-                break
-        
-        # Ultra-aggressive approaches that completely avoid user data directories
-        approaches = [
-            {
-                'name': 'No user data directory with disable flags',
-                'method': 'no_user_data'
-            },
-            {
-                'name': 'Memory filesystem with temp user data',
-                'method': 'memory_fs'
-            },
-            {
-                'name': 'Explicit temp directory override',
-                'method': 'temp_override'
-            },
-            {
-                'name': 'Emergency mode - no profile at all',
-                'method': 'emergency_no_profile'
-            }
-        ]
-        
-        for i, approach in enumerate(approaches, 1):
-            try:
-                print(f"🔄 Attempt {i}: {approach['name']}")
-                
-                chrome_options = Options()
-                
-                # Ultra-aggressive base options to prevent any user data directory usage
-                chrome_options.add_argument('--headless=new')
-                chrome_options.add_argument('--no-sandbox')
-                chrome_options.add_argument('--disable-dev-shm-usage')
-                chrome_options.add_argument('--disable-gpu')
-                chrome_options.add_argument('--window-size=1920,1080')
-                chrome_options.add_argument('--no-first-run')
-                chrome_options.add_argument('--no-default-browser-check')
-                chrome_options.add_argument('--disable-extensions')
-                chrome_options.add_argument('--disable-plugins')
-                chrome_options.add_argument('--disable-sync')
-                chrome_options.add_argument('--disable-translate')
-                chrome_options.add_argument('--disable-background-networking')
-                chrome_options.add_argument('--disable-background-timer-throttling')
-                chrome_options.add_argument('--disable-backgrounding-occluded-windows')
-                chrome_options.add_argument('--disable-renderer-backgrounding')
-                chrome_options.add_argument('--disable-features=TranslateUI')
-                chrome_options.add_argument('--disable-ipc-flooding-protection')
-                chrome_options.add_argument('--remote-debugging-port=0')
-                chrome_options.add_argument('--disable-web-security')
-                chrome_options.add_argument('--disable-features=VizDisplayCompositor')
-                chrome_options.add_argument('--disable-logging')
-                chrome_options.add_argument('--silent')
-                chrome_options.add_argument('--disable-session-crashed-bubble')
-                chrome_options.add_argument('--disable-restore-session-state')
-                chrome_options.add_argument('--disable-background-mode')
-                chrome_options.add_argument('--disable-default-apps')
-                chrome_options.add_argument('--disable-component-update')
-                chrome_options.add_argument('--disable-client-side-phishing-detection')
-                chrome_options.add_argument('--disable-features=MediaRouter')
-                chrome_options.add_argument('--disable-hang-monitor')
-                chrome_options.add_argument('--disable-prompt-on-repost')
-                chrome_options.add_argument('--disable-domain-reliability')
-                chrome_options.add_argument('--disable-features=AutofillServerCommunication')
-                
-                if approach['method'] == 'no_user_data':
-                    # Most aggressive: try to completely disable user data directory
-                    chrome_options.add_argument('--disable-user-data-dir')
-                    chrome_options.add_argument('--incognito')
-                    chrome_options.add_argument('--memory-pressure-off')
-                    chrome_options.add_argument('--disable-features=UserDataDir')
-                    chrome_options.add_argument('--disable-features=ProfileManagement')
-                    chrome_options.add_argument('--disable-features=ProfilePicker')
-                    chrome_options.add_argument('--single-process')
-                    chrome_options.add_argument('--no-zygote')
-                    
-                elif approach['method'] == 'memory_fs':
-                    # Use memory filesystem with unique timestamp
-                    import tempfile
-                    memory_dir = f"/dev/shm/chrome_ultra_{os.getpid()}_{int(time.time() * 1000)}_{random.randint(100000, 999999)}"
-                    # Ensure it doesn't exist
-                    if os.path.exists(memory_dir):
-                        shutil.rmtree(memory_dir, ignore_errors=True)
-                        time.sleep(0.5)
-                    
-                    chrome_options.add_argument(f'--user-data-dir={memory_dir}')
-                    chrome_options.add_argument('--incognito')
-                    chrome_options.add_argument('--disable-session-crashed-bubble')
-                    chrome_options.add_argument('--disable-restore-session-state')
-                    chrome_options.add_argument('--single-process')
-                    print(f"🗂️ Using memory directory: {memory_dir}")
-                    
-                elif approach['method'] == 'temp_override':
-                    # Use a completely unique temp directory with process ID and nanoseconds
-                    import tempfile
-                    temp_base = tempfile.gettempdir()
-                    unique_suffix = f"{os.getpid()}_{int(time.time() * 1000000)}_{random.randint(1000000, 9999999)}"
-                    temp_dir = os.path.join(temp_base, f"chrome_unique_{unique_suffix}")
-                    
-                    # Ensure it absolutely doesn't exist
-                    if os.path.exists(temp_dir):
-                        shutil.rmtree(temp_dir, ignore_errors=True)
-                        time.sleep(1)
-                    
-                    chrome_options.add_argument(f'--user-data-dir={temp_dir}')
-                    chrome_options.add_argument('--incognito')
-                    chrome_options.add_argument('--single-process')
-                    chrome_options.add_argument('--no-zygote')
-                    print(f"🗂️ Using temp directory: {temp_dir}")
-                    
-                elif approach['method'] == 'emergency_no_profile':
-                    # Emergency: try with absolutely minimal flags
-                    chrome_options = Options()  # Start fresh
-                    chrome_options.add_argument('--headless')
-                    chrome_options.add_argument('--no-sandbox')
-                    chrome_options.add_argument('--disable-dev-shm-usage')
-                    chrome_options.add_argument('--disable-gpu')
-                    chrome_options.add_argument('--window-size=1920,1080')
-                    chrome_options.add_argument('--single-process')
-                    chrome_options.add_argument('--no-zygote')
-                    chrome_options.add_argument('--incognito')
-                    chrome_options.add_argument('--disable-extensions')
-                    chrome_options.add_argument('--disable-plugins')
-                    chrome_options.add_argument('--no-first-run')
-                    # Try to force Chrome to use a completely random temp location
-                    emergency_dir = f"/tmp/chrome_emergency_{os.getpid()}_{int(time.time() * 1000000)}"
-                    chrome_options.add_argument(f'--user-data-dir={emergency_dir}')
-                
-                # Set Chrome binary if found
-                if chrome_binary:
-                    chrome_options.binary_location = chrome_binary
-                
-                # Set user agent
-                chrome_options.add_argument('--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
-                
-                # Try to create the driver
-                driver = webdriver.Chrome(options=chrome_options)
-                print(f"✅ Chrome WebDriver initialized successfully with approach {i}")
-                
-                # Store temp directory for cleanup if it was created
-                if approach['method'] in ['memory_fs', 'temp_override', 'emergency_no_profile']:
-                    if 'memory_dir' in locals():
-                        setup_driver.cleanup_dir = memory_dir
-                    elif 'temp_dir' in locals():
-                        setup_driver.cleanup_dir = temp_dir
-                    elif 'emergency_dir' in locals():
-                        setup_driver.cleanup_dir = emergency_dir
-                
-                return driver
-                
-            except Exception as e:
-                print(f"❌ Attempt {i} failed: {e}")
-                
-                # Cleanup any directories that were created
-                for cleanup_var in ['memory_dir', 'temp_dir', 'emergency_dir']:
-                    if cleanup_var in locals() and os.path.exists(locals()[cleanup_var]):
-                        try:
-                            shutil.rmtree(locals()[cleanup_var], ignore_errors=True)
-                            print(f"🧹 Cleaned up {cleanup_var}: {locals()[cleanup_var]}")
-                        except:
-                            pass
-                
-                # Wait between attempts and kill any Chrome processes that might have started
-                time.sleep(2)
-                cleanup_chrome_processes()
-                continue
-        
-        print("❌ All ultra-aggressive approaches failed")
-        return None
-    
     else:
-        # Local development
+        # Local development - use Chrome
         print("💻 Running in local mode")
-        chrome_options = Options()
-        chrome_options.add_argument('--no-sandbox')
-        chrome_options.add_argument('--disable-dev-shm-usage')
-        chrome_options.add_argument('--disable-gpu')
-        chrome_options.add_argument('--window-size=1920,1080')
         
         try:
+            chrome_options = Options()
+            chrome_options.add_argument('--no-sandbox')
+            chrome_options.add_argument('--disable-dev-shm-usage')
+            chrome_options.add_argument('--disable-gpu')
+            chrome_options.add_argument('--window-size=1920,1080')
+            
             service = Service(ChromeDriverManager().install())
             driver = webdriver.Chrome(service=service, options=chrome_options)
-            print("✅ Chrome WebDriver initialized successfully")
+            print("✅ Local Chrome WebDriver initialized successfully")
             return driver
         except Exception as e:
-            print(f"❌ Error in local mode: {e}")
+            print(f"❌ Local Chrome failed: {e}")
             return None
 
 def scrape_penn_state_majors_selenium():
@@ -350,17 +211,20 @@ def scrape_penn_state_majors_selenium():
     except Exception as e:
         print(f"❌ Unexpected error: {e}")
     finally:
-        driver.quit()
-        print("🔒 Browser closed")
-        
-                # Cleanup temporary directories if any were created
-        if hasattr(setup_driver, 'cleanup_dir') and setup_driver.cleanup_dir:
-            try:
-                if os.path.exists(setup_driver.cleanup_dir):
-                    shutil.rmtree(setup_driver.cleanup_dir)
-                    print(f"🧹 Cleaned up temp directory: {setup_driver.cleanup_dir}")
-            except Exception as cleanup_error:
-                print(f"⚠️ Could not cleanup temp directory: {cleanup_error}")
+        if driver:
+            driver.quit()
+            print("🔒 Browser closed")
+            
+            # Cleanup temporary directories
+            if hasattr(setup_driver, 'cleanup_dir') and setup_driver.cleanup_dir:
+                try:
+                    if os.path.exists(setup_driver.cleanup_dir):
+                        shutil.rmtree(setup_driver.cleanup_dir)
+                        print(f"🧹 Cleaned up temp directory: {setup_driver.cleanup_dir}")
+                except Exception as cleanup_error:
+                    print(f"⚠️ Could not cleanup temp directory: {cleanup_error}")
+            
+            cleanup_browser_processes()
     
     return majors
 
