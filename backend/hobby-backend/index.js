@@ -66,7 +66,7 @@ const PORT = process.env.PORT || 5009;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const hobbies = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "src", "data", "hobbies.json")));
+let hobbies = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "src", "data", "hobbies.json")));
 const hobbyVectorPath = path.join(__dirname, "openAI_hobby_vectors.json");
 let hobbyVectors = loadVectors(hobbyVectorPath);
 
@@ -269,13 +269,15 @@ app.post("/api/hobbies/normalize", async (req, res) => {
     }
 
     if (!hobbyVectors[normalized]) {
-              debugLog(`Vectorizing new hobby: "${normalized}"`);
+      debugLog(`Vectorizing new hobby: "${normalized}"`);
+      console.log(`🔍 Before adding - hobbies count: ${hobbies.length}`);
       const vec = await vectorizeAndSave(normalized, hobbyVectorPath, hobbyVectors, "This is a hobby or leisure activity someone might enjoy: ");
       if (vec) {
         hobbyVectors[normalized] = vec;
         hobbies.push(normalized);
         updated = true;
-                  debugLog(`Added "${normalized}" to hobby list and vector set.`);
+        console.log(`✅ Added "${normalized}" to hobby list. New count: ${hobbies.length}`);
+        debugLog(`Added "${normalized}" to hobby list and vector set.`);
       } else {
         console.warn(`Failed to vectorize: "${normalized}"`);
         continue;
@@ -285,8 +287,16 @@ app.post("/api/hobbies/normalize", async (req, res) => {
   }
 
   if (updated) {
+    console.log(`💾 Writing ${hobbies.length} hobbies to file...`);
+    const hobbiesFilePath = path.join(__dirname, "..", "..", "src", "data", "hobbies.json");
+    
     fs.writeFileSync(hobbyVectorPath, JSON.stringify(hobbyVectors, null, 2));
-    fs.writeFileSync(path.join(__dirname, "..", "..", "src", "data", "hobbies.json"), JSON.stringify(hobbies, null, 2));
+    fs.writeFileSync(hobbiesFilePath, JSON.stringify(hobbies, null, 2));
+    
+    // Verify the write worked
+    const written = JSON.parse(fs.readFileSync(hobbiesFilePath, 'utf8'));
+    console.log(`✅ Verified: ${written.length} hobbies written to ${hobbiesFilePath}`);
+    
     debugLog("Hobby list and vector file updated.");
   }
 
@@ -295,6 +305,10 @@ app.post("/api/hobbies/normalize", async (req, res) => {
 
 app.get("/api/hobbies/vectors", (req, res) => {
   res.json(hobbyVectors);
+});
+
+app.get("/api/hobbies", (req, res) => {
+  res.json(hobbies);
 });
 
 // Test endpoint for text vectorization
