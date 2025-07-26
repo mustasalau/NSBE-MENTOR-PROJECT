@@ -288,7 +288,12 @@ app.post("/api/hobbies/normalize", async (req, res) => {
 
   if (updated) {
     console.log(`💾 Writing ${hobbies.length} hobbies to file...`);
+    console.log(`🔍 Current working directory: ${process.cwd()}`);
+    console.log(`🔍 __dirname is: ${__dirname}`);
+    
     const hobbiesFilePath = path.join(__dirname, "..", "..", "src", "data", "hobbies.json");
+    console.log(`🔍 Calculated hobbies path: ${hobbiesFilePath}`);
+    console.log(`🔍 Path exists before write: ${fs.existsSync(hobbiesFilePath)}`);
     
     fs.writeFileSync(hobbyVectorPath, JSON.stringify(hobbyVectors, null, 2));
     fs.writeFileSync(hobbiesFilePath, JSON.stringify(hobbies, null, 2));
@@ -296,6 +301,11 @@ app.post("/api/hobbies/normalize", async (req, res) => {
     // Verify the write worked
     const written = JSON.parse(fs.readFileSync(hobbiesFilePath, 'utf8'));
     console.log(`✅ Verified: ${written.length} hobbies written to ${hobbiesFilePath}`);
+    
+    // IMPORTANT: Reload the hobbies array from the file to ensure consistency
+    hobbies.length = 0; // Clear current array
+    hobbies.push(...written); // Reload from file
+    console.log(`🔄 Reloaded hobbies array from file: ${hobbies.length} hobbies`);
     
     debugLog("Hobby list and vector file updated.");
   }
@@ -308,6 +318,8 @@ app.get("/api/hobbies/vectors", (req, res) => {
 });
 
 app.get("/api/hobbies", (req, res) => {
+  console.log(`🔍 /api/hobbies called - returning ${hobbies.length} hobbies`);
+  console.log(`🔍 Last 3 hobbies in memory: ${hobbies.slice(-3).join(', ')}`);
   res.json(hobbies);
 });
 
