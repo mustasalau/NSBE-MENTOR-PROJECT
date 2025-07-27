@@ -3,7 +3,7 @@ import Fuse from "fuse.js";
 import axios from "axios";
 import majorsList from "@/data/majors.json";
 import clubList from "@/data/clubs.json";
-import hobbiesList from "@/data/hobbies.json";
+// import hobbiesList from "@/data/hobbies.json"; // Now loaded dynamically
 import Confetti from "react-confetti";
 import { Link } from "react-router-dom";
 
@@ -55,6 +55,8 @@ export default function SharedForm({ role, onSubmit }) {
   const [traitClickInProgress, setTraitClickInProgress] = useState(false);
   const [clubsLoading, setClubsLoading] = useState(false);
   const [hobbyVectors, setHobbyVectors] = useState({});
+  const [hobbiesList, setHobbiesList] = useState([]);
+  const [hobbyFuse, setHobbyFuse] = useState(null);
   const progressPercent = Math.round(((step - 1) / 8) * 100);
   const [showConfetti, setShowConfetti] = useState(false);
   const [showTitle, setShowTitle] = useState(false);
@@ -206,6 +208,7 @@ export default function SharedForm({ role, onSubmit }) {
   };
 
   useEffect(() => {
+    // Load trait vectors
     axios
       .get(`${import.meta.env.VITE_BACKEND_URL || "https://nsbe-mentor-project.onrender.com"}/api/traits/vectors`)
       .then((res) => {
@@ -222,7 +225,71 @@ export default function SharedForm({ role, onSubmit }) {
       .catch((err) => {
         console.error("Failed to load trait vectors:", err);
       });
+
+    // Load hobbies list dynamically
+    console.log("🔄 Loading hobbies from API...");
+    axios
+      .get(`${import.meta.env.VITE_BACKEND_URL || "https://nsbe-mentor-project.onrender.com"}/api/hobbies`)
+      .then((res) => {
+        console.log("✅ Loaded hobbies dynamically:", res.data.length);
+        console.log("🔍 Last 5 hobbies from API:", res.data.slice(-5));
+        console.log("🔍 Netflix in hobbies?", res.data.includes("Netflix"));
+        setHobbiesList(res.data);
+      })
+      .catch((err) => {
+        console.error("❌ Failed to load hobbies from API:", err);
+        console.log("🔄 Trying fallback to static import...");
+        // Fallback to static import if API fails
+        import("@/data/hobbies.json").then((staticHobbies) => {
+          console.log("⚠️ Using static hobbies fallback:", staticHobbies.default.length);
+          console.log("🔍 Netflix in static hobbies?", staticHobbies.default.includes("Netflix"));
+          setHobbiesList(staticHobbies.default);
+        });
+      });
+
+    // Load traits list dynamically (for potential future dynamic trait additions)
+    axios
+      .get(`${import.meta.env.VITE_BACKEND_URL || "https://nsbe-mentor-project.onrender.com"}/api/traits`)
+      .then((res) => {
+        console.log("✅ Loaded traits dynamically:", res.data.length);
+        // Update traitFuse if needed in the future
+      })
+      .catch((err) => {
+        console.error("Failed to load traits:", err);
+      });
+
+    // Load hobby vectors
+    axios
+      .get(`${import.meta.env.VITE_BACKEND_URL || "https://nsbe-mentor-project.onrender.com"}/api/hobbies/vectors`)
+      .then((res) => {
+        setHobbyVectors(res.data);
+      })
+      .catch((err) => {
+        console.error("Failed to load hobby vectors:", err);
+             });
   }, []);
+
+  // Create Fuse instance when hobbies list changes
+  useEffect(() => {
+    if (hobbiesList.length > 0) {
+      console.log("🔄 Creating Fuse instance...");
+      console.log("🔍 hobbiesList length:", hobbiesList.length);
+      console.log("🔍 Last 3 hobbies for Fuse:", hobbiesList.slice(-3));
+      console.log("🔍 Netflix in hobbiesList for Fuse?", hobbiesList.includes("Netflix"));
+      
+      const fuse = new Fuse(hobbiesList, {
+        threshold: 0.3,
+        minMatchCharLength: 2,
+        shouldSort: true,
+      });
+      setHobbyFuse(fuse);
+      console.log("✅ Created Fuse instance with", hobbiesList.length, "hobbies");
+      
+      // Test search for Netflix specifically
+      const testSearch = fuse.search("Netflix");
+      console.log("🧪 Test search for 'Netflix':", testSearch);
+    }
+  }, [hobbiesList]);
 
   const selectSpotifyResult = (index, item) => {
     console.log(`Selected item:`, item);
@@ -394,11 +461,7 @@ export default function SharedForm({ role, onSubmit }) {
     setFocusedOrgOption(updatedFocus.length > 0 ? updatedFocus : [-1]);
   };
 
-  const fuse = new Fuse(hobbiesList, {
-    threshold: 0.3,
-    minMatchCharLength: 2,
-    shouldSort: true,
-  });
+  // Fuse instance now created dynamically in useEffect
 
   // Load trait vectors, handle hobby suggestions, etc.
   // You can extract your existing handlers like:
@@ -444,7 +507,7 @@ export default function SharedForm({ role, onSubmit }) {
           const titleCaseHobby = h.replace(/\b\w/g, (c) => c.toUpperCase());
           
           return !hobbyVectors[titleCaseHobby] && 
-            !fuse.search(h).some((r) => r.item.toLowerCase() === h.toLowerCase());
+            (!hobbyFuse || !hobbyFuse.search(h).some((r) => r.item.toLowerCase() === h.toLowerCase()));
         });
 
       if (unknownHobbies.length > 0) {
@@ -461,13 +524,18 @@ export default function SharedForm({ role, onSubmit }) {
         const data = await res.json();
         console.log("✅ Hobbies vectorized:", data);
 
-        // Reload vector list after backend updates
-        const updated = await fetch(
-          `${import.meta.env.VITE_BACKEND_URL || "https://nsbe-mentor-project.onrender.com"}/api/hobbies/vectors`,
-        );
-        const vectors = await updated.json();
+        // Reload vectors and hobbies list after backend updates
+        const [vectorsResponse, hobbiesResponse] = await Promise.all([
+          fetch(`${import.meta.env.VITE_BACKEND_URL || "https://nsbe-mentor-project.onrender.com"}/api/hobbies/vectors`),
+          fetch(`${import.meta.env.VITE_BACKEND_URL || "https://nsbe-mentor-project.onrender.com"}/api/hobbies`)
+        ]);
+        
+        const vectors = await vectorsResponse.json();
+        const updatedHobbies = await hobbiesResponse.json();
+        
         setHobbyVectors(vectors);
-        fuse.setCollection(Object.keys(vectors));
+        setHobbiesList(updatedHobbies);
+        console.log("✅ Reloaded hobbies list after adding new ones:", updatedHobbies.length);
       }
 
       // Step 2: Vectorize unknown personality traits
@@ -594,7 +662,7 @@ export default function SharedForm({ role, onSubmit }) {
     setFormData((prev) => ({ ...prev, hobbies }));
 
     if (value.trim()) {
-      const results = fuse.search(value.trim()).map((r) => r.item);
+      const results = hobbyFuse ? hobbyFuse.search(value.trim()).map((r) => r.item) : [];
       setHobbySuggestions(results);
       setActiveHobbyIndex(index);
     } else {
@@ -741,14 +809,17 @@ export default function SharedForm({ role, onSubmit }) {
     setFormData({ ...formData, personalityWords: updated });
 
     if (value.trim().length >= 2 && traitFuse) {  
-    const results = traitFuse.search(value).map((r) => r.item);
-    setTraitSuggestions(results);
-    setActiveTraitIndex(index);
-  } else {
-    setTraitSuggestions([]);
-    setActiveTraitIndex(null);
-  }
-};
+      const results = traitFuse.search(value).map((r) => r.item);
+      // Only update if results are different to prevent duplicate renders
+      if (JSON.stringify(results) !== JSON.stringify(traitSuggestions) || activeTraitIndex !== index) {
+        setTraitSuggestions(results);
+        setActiveTraitIndex(index);
+      }
+    } else {
+      setTraitSuggestions([]);
+      setActiveTraitIndex(null);
+    }
+  };
 
   const handleSelectTraitSuggestion = (index, suggestion) => {
     const updated = [...formData.personalityWords];
@@ -992,7 +1063,7 @@ export default function SharedForm({ role, onSubmit }) {
                     onFocus={() => {
                       const value = hobbyObj.trim() || "";
                       if (value) {
-                        const results = fuse.search(value).map((r) => r.item);
+                        const results = hobbyFuse ? hobbyFuse.search(value).map((r) => r.item) : [];
                         setHobbySuggestions(results);
                         setActiveHobbyIndex(index);
                         setFocusedHobbyOption(-1);
@@ -1473,9 +1544,12 @@ export default function SharedForm({ role, onSubmit }) {
   const value = traitObj?.raw?.trim() || "";
   if (value && value.length >= 2 && traitFuse?.search) {
     const results = traitFuse.search(value).map((r) => r.item);
-    setTraitSuggestions(results);
-    setActiveTraitIndex(index);
-    setFocusedTraitOption(-1);
+    // Only update if results are different or field changed to prevent duplicates
+    if (JSON.stringify(results) !== JSON.stringify(traitSuggestions) || activeTraitIndex !== index) {
+      setTraitSuggestions(results);
+      setActiveTraitIndex(index);
+      setFocusedTraitOption(-1);
+    }
   }
 }}
                     onBlur={() => {
