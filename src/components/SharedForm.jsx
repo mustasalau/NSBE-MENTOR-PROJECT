@@ -68,7 +68,7 @@ export default function SharedForm({ role, onSubmit }) {
     email: "Email should end with @psu.edu",
     studentId: "Student ID must be exactly 9 digits.",
     hobbies: "Please fill out all hobby fields (no blanks).",
-    musicalArtists: "Please fill out all music fields (no blanks).",
+    musicalArtists: "Please select all artists from Spotify results (no custom entries allowed).",
     organizations: "Please fill out all organization fields (no blanks).",
     major: "Please select a major from the list.",
     firstName: "First Name is required.",
@@ -123,7 +123,17 @@ export default function SharedForm({ role, onSubmit }) {
           return val.some((h) => (h || "").trim() === "") || val.length === 0;
         }
 
-        if (field === "musicalArtists" || field === "organizations") {
+        if (field === "musicalArtists") {
+          // Check if all artists have been selected from Spotify (not just typed)
+          return (
+            val.some((v) => (v?.trim?.() || "") === "") || 
+            val.length === 0 ||
+            // Check if all artists have corresponding Spotify selections
+            val.some((_, index) => !spotifyResults[index]?.selectedItem)
+          );
+        }
+        
+        if (field === "organizations") {
           return (
             val.some((v) => (v?.trim?.() || "") === "") || val.length === 0
           );
@@ -1216,11 +1226,15 @@ export default function SharedForm({ role, onSubmit }) {
 
                   {/* Input area */}
                   <div
-                    className={`flex-grow relative border rounded flex items-center px-2 py-1 min-h-[48px] ${errors.includes("musicalArtists") &&
-                        (!artist || artist.trim() === "")
+                    className={`flex-grow relative border rounded flex items-center px-2 py-1 min-h-[48px] ${
+                      errors.includes("musicalArtists") && (!artist || artist.trim() === "")
                         ? "border-red-500"
+                        : artist && artist.trim() !== "" && !selected
+                        ? "border-amber-500 bg-amber-50"
+                        : selected
+                        ? "border-green-500 bg-green-50"
                         : ""
-                      }`}
+                    }`}
                   >
                     {/* Album Art */}
                     {selected?.image && (
@@ -1305,6 +1319,13 @@ export default function SharedForm({ role, onSubmit }) {
                         </li>
                       ))}
                     </ul>
+                  )}
+                  
+                  {/* Warning message for unselected text */}
+                  {artist && artist.trim() !== "" && !selected && (
+                    <div className="absolute left-12 top-full mt-1 text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1 z-10">
+                      ⚠️ Please select from Spotify results above
+                    </div>
                   )}
                 </div>
               );

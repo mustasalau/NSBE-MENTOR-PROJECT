@@ -212,24 +212,34 @@ for (let i = 0; i < traitCandidatePaths.length; i++) {
 
 if (!traitsLoaded) {
   console.log(`🆕 No traits file found at any path, creating default list...`);
-  
-  // Default to the local backend data directory for creation
   actualTraitsPath = path.join(__dirname, "data", "traits.json");
+
+  // 🔄 DYNAMIC FALLBACK: Try to read from source file first
+  let dynamicTraits = [];
+  const sourceTraitsPath = path.join(__dirname, "..", "..", "src", "data", "traits.json");
   
-  traits = [
-    "ambitious", "analytical", "articulate", "confident", "creative", "curious",
-    "dedicated", "driven", "empathetic", "enthusiastic", "flexible", "friendly",
-    "hardworking", "innovative", "intelligent", "kind", "motivated", "organized",
-    "passionate", "patient", "reliable", "resourceful", "responsible", "thoughtful"
-  ];
+  try {
+    console.log(`📖 Attempting to read source traits from: ${sourceTraitsPath}`);
+    dynamicTraits = JSON.parse(fs.readFileSync(sourceTraitsPath, 'utf8'));
+    console.log(`✅ Successfully loaded ${dynamicTraits.length} traits from source file`);
+  } catch (sourceError) {
+    console.log(`⚠️ Could not read source traits file: ${sourceError.message}`);
+    console.log(`🔄 Falling back to hardcoded traits list...`);
+    
+    // Fallback to hardcoded list if source file can't be read
+    dynamicTraits = [
+      "Type-B", "able", "accomplished", "accountable", "active", "adaptable", "adept", "adventurous", "affectionate", "ambitious", "amiable", "analytical", "approachable", "articulate", "artistic", "assertive", "athletic", "attentive", "authentic", "awkward", "balanced", "bilingual", "brave", "broad-minded", "bubbly", "calm", "candid", "capable", "carefree", "careful", "caring", "cautious", "cheerful", "clever", "clumsy", "collaborative", "committed", "communicative", "community-minded", "compassionate", "competitive", "confident", "conscientious", "conservative", "considerate", "consistent", "controversial", "cooperative", "courageous", "courteous", "crazy", "creative", "cultured", "curious", "daring", "decisive", "dedicated", "delivered", "dependable", "detail-oriented", "determined", "devoted", "diligent", "diplomatic", "direct", "discerning", "down-to-earth", "driven", "dynamic", "easygoing", "eccentric", "eclectic", "educated", "efficient", "emotional", "empathetic", "encouraging", "energetic", "engaged", "enterprising", "enthusiastic", "entrepreneurial", "ethical", "experienced", "extroverted", "exuberant", "fair", "family-oriented", "fast", "fearless", "fierce", "fit", "flexible", "focused", "forgiving", "friendly", "fun", "funny", "generous", "gentle", "genuine", "goal-oriented", "goofy", "gregarious", "happy", "hardworking", "helpful", "high-achieving", "honest", "humble", "humorous", "idealistic", "imaginative", "impartial", "independent", "individualistic", "innovative", "insightful", "inspirational", "instinctive", "intellectual", "intelligent", "intense", "interactive", "interesting", "international", "introverted", "intuitive", "inventive", "judicious", "kind", "kindhearted", "knowledgeable", "laid-back", "leadership", "level-headed", "lighthearted", "logical", "loving", "loyal", "mature", "methodical", "meticulous", "mindful", "modest", "motivated", "multilingual", "musical", "networker", "observant", "open", "open-minded", "optimistic", "organized", "original", "outdoorsy", "outgoing", "outspoken", "particular", "passionate", "patient", "peaceful", "perceptive", "perfectionist", "perseverant", "persistent", "personable", "persuasive", "philosophical", "playful", "polite", "political", "positive", "practical", "pragmatic", "precise", "proactive", "productive", "professional", "progressive", "protective", "proud", "punctual", "quick", "quiet", "quirky", "random", "rational", "realistic", "rebellious", "receptive", "reflective", "reliable", "religious", "resilient", "resolute", "resourceful", "respectful", "responsible", "responsive", "result-driven", "result-oriented", "romantic", "scientific", "self-assured", "self-aware", "self-disciplined", "self-reliant", "selfless", "sensible", "sensitive", "sensuous", "serious", "sexy", "shrewd", "shy", "silly", "sincere", "skilled", "sociable", "socially conscious", "soft-spoken", "solid", "sophisticated", "spiritual", "spontaneous", "sporty", "stable", "strategic", "strong", "strong-willed", "studious", "successful", "supportive", "sweet", "tactful", "talented", "tech-savvy", "tenacious", "thorough", "thoughtful", "tidy", "tolerant", "tough", "traditional", "trustworthy", "unconventional", "understanding", "unique", "unusual", "upbeat", "versatile", "vibrant", "visionary", "warm", "warmhearted", "wise", "witty", "worldly"
+    ];
+  }
+
+  traits = dynamicTraits;
   
-  // Try to create the file
   try {
     const dir = path.dirname(actualTraitsPath);
     console.log(`🔍 Creating traits directory: ${dir}`);
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(actualTraitsPath, JSON.stringify(traits, null, 2));
-    console.log(`✅ Created default traits file at ${actualTraitsPath}`);
+    console.log(`✅ Created traits file at ${actualTraitsPath} with ${traits.length} traits`);
   } catch (writeError) {
     console.log(`⚠️ Could not create traits file: ${writeError.message}`);
   }
