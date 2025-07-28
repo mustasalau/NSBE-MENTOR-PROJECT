@@ -15,8 +15,9 @@ const debugLog = (...args) => {
   }
 };
 
-import { vectorizeAndSave, loadVectors, vectorizeText, arrayToVectorString } from "./openAIhelpers.js";import traitRoutes from "./traitRoutes.js";
-import spotifyRoutes from "./spotifyRoutes.js";
+import { vectorizeAndSave, loadVectors, vectorizeText, arrayToVectorString } from "./openAIhelpers.js";
+import traitRoutes from "./traitRoutes.js";
+import spotifyRoutes, { getFallbackGenres } from "./spotifyRoutes.js";
 
 dotenv.config();
 const { Pool } = pg;
@@ -782,6 +783,31 @@ app.post("/api/submit", async (req, res) => {
           
           if (embeddingArray && embeddingArray.length === 1536) {
             traitVectorArrays.push(embeddingArray); // ✅ Just push the raw array
+          }
+        }
+      }
+    }
+
+    // ✅ CRITICAL: Validate that all musical artists have genres (required for matching)
+    if (musicalArtists && Array.isArray(musicalArtists)) {
+      for (let i = 0; i < musicalArtists.length; i++) {
+        const artist = musicalArtists[i];
+        if (artist && typeof artist === 'object') {
+          // Check if genres are missing or empty
+          if (!artist.genres || !Array.isArray(artist.genres) || artist.genres.length === 0) {
+            const artistName = artist.displayName || artist.name || 'Unknown Artist';
+            debugLog(`⚠️ Musical artist "${artistName}" missing genres - attempting to add fallback genres`);
+            
+            // Try to get fallback genres for this artist
+            const fallbackGenresForArtist = getFallbackGenres(artistName);
+            if (fallbackGenresForArtist.length > 0) {
+              artist.genres = fallbackGenresForArtist;
+              debugLog(`✅ Added fallback genres for "${artistName}": ${fallbackGenresForArtist.join(', ')}`);
+            } else {
+              // Last resort - assign generic genres based on submission patterns
+              artist.genres = ['pop']; // Most common fallback
+              debugLog(`⚠️ No fallback genres found for "${artistName}" - using generic 'pop' genre`);
+            }
           }
         }
       }
