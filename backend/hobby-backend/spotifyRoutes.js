@@ -153,7 +153,11 @@ async function fetchArtistGenres(artistId, artistName = null) {
 
       const resp = await fetch(`https://api.spotify.com/v1/artists/${artistId}`, {
         headers: { Authorization: `Bearer ${token}` },
-        signal: controller.signal
+        signal: controller.signal,
+        catch (err) {
+          console.error('Network error:', err.message);
+        }
+
       });
 
       clearTimeout(timeoutId);
@@ -230,6 +234,9 @@ router.get("/search", async (req, res) => {
   const fetchSpotify = () =>
     fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track,album,artist&limit=5`, {
       headers: { Authorization: `Bearer ${token}` },
+      catch (err) {
+        console.error('Network error:', err.message);
+      }
     });
 
   try {

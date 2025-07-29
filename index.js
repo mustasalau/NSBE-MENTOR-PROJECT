@@ -47,6 +47,9 @@ app.get('/search-song', async (req, res) => {
         q,
         type: 'track',
         limit: 5
+      },
+      catch (err) {
+        console.error('Network error:', err.message);
       }
     });
 
