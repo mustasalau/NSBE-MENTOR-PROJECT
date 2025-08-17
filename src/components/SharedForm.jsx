@@ -57,12 +57,105 @@ export default function SharedForm({ role, onSubmit }) {
   const [hobbyVectors, setHobbyVectors] = useState({});
   const [hobbiesList, setHobbiesList] = useState([]);
   const [hobbyFuse, setHobbyFuse] = useState(null);
+  const [confirmedHobbies, setConfirmedHobbies] = useState(new Set()); // Track which hobbies have been confirmed
+  const [lastHobbiesRefresh, setLastHobbiesRefresh] = useState(Date.now());
+  const [hobbiesRefreshInterval, setHobbiesRefreshInterval] = useState(null);
+  const [newHobbiesDiscovered, setNewHobbiesDiscovered] = useState([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastTraitsRefresh, setLastTraitsRefresh] = useState(Date.now());
+  const [newTraitsDiscovered, setNewTraitsDiscovered] = useState([]);
+  const [isRefreshingTraits, setIsRefreshingTraits] = useState(false);
   const progressPercent = Math.round(((step - 1) / 8) * 100);
   const [showConfetti, setShowConfetti] = useState(false);
   const [showTitle, setShowTitle] = useState(false);
   const [showMessage, setShowMessage] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const BASE_URL = import.meta.env.VITE_BACKEND_URL || "https://nsbe-mentor-project.onrender.com";
+
+  // Function to refresh hobbies list and vectors
+  const refreshHobbiesList = async () => {
+    if (isRefreshing) return; // Prevent multiple simultaneous refreshes
+    
+    try {
+      setIsRefreshing(true);
+      console.log("🔄 Refreshing hobbies list...");
+      
+      const [vectorsResponse, hobbiesResponse] = await Promise.all([
+        axios.get(`${BASE_URL}/api/hobbies/vectors`),
+        axios.get(`${BASE_URL}/api/hobbies`)
+      ]);
+      
+      const vectors = vectorsResponse.data;
+      const updatedHobbies = hobbiesResponse.data;
+      
+      // Detect new hobbies that weren't in the previous list
+      const previousHobbies = new Set(hobbiesList);
+      const newHobbies = updatedHobbies.filter(hobby => !previousHobbies.has(hobby));
+      
+      if (newHobbies.length > 0) {
+        console.log(`🎉 Discovered ${newHobbies.length} new hobbies:`, newHobbies);
+        setNewHobbiesDiscovered(newHobbies);
+        
+        // Auto-hide notification after 5 seconds
+        setTimeout(() => {
+          setNewHobbiesDiscovered([]);
+        }, 5000);
+      }
+      
+      setHobbyVectors(vectors);
+      setHobbiesList(updatedHobbies);
+      setLastHobbiesRefresh(Date.now());
+      
+      console.log(`✅ Hobbies list refreshed: ${updatedHobbies.length} hobbies, ${Object.keys(vectors).length} vectors`);
+      console.log(`🔍 Last 3 new hobbies:`, updatedHobbies.slice(-3));
+    } catch (err) {
+      console.error("❌ Failed to refresh hobbies list:", err);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Function to refresh traits list and vectors
+  const refreshTraitsList = async () => {
+    if (isRefreshingTraits) return; // Prevent multiple simultaneous refreshes
+    
+    try {
+      setIsRefreshingTraits(true);
+      console.log("🔄 Refreshing traits list...");
+      
+      const [vectorsResponse, traitsResponse] = await Promise.all([
+        axios.get(`${BASE_URL}/api/traits/vectors`),
+        axios.get(`${BASE_URL}/api/traits`)
+      ]);
+      
+      const vectors = vectorsResponse.data;
+      const updatedTraits = traitsResponse.data;
+      
+      // Detect new traits that weren't in the previous list
+      const previousTraits = new Set(Object.keys(traitVectors));
+      const newTraits = updatedTraits.filter(trait => !previousTraits.has(trait));
+      
+      if (newTraits.length > 0) {
+        console.log(`🎉 Discovered ${newTraits.length} new traits:`, newTraits);
+        setNewTraitsDiscovered(newTraits);
+        
+        // Auto-hide notification after 5 seconds
+        setTimeout(() => {
+          setNewTraitsDiscovered([]);
+        }, 5000);
+      }
+      
+      setTraitVectors(vectors);
+      setLastTraitsRefresh(Date.now());
+      
+      console.log(`✅ Traits list refreshed: ${updatedTraits.length} traits, ${Object.keys(vectors).length} vectors`);
+      console.log(`🔍 Last 3 new traits:`, updatedTraits.slice(-3));
+    } catch (err) {
+      console.error("❌ Failed to refresh traits list:", err);
+    } finally {
+      setIsRefreshingTraits(false);
+    }
+    }
 
   const errorMessages = {
     email: "Email should end with @psu.edu",
@@ -120,7 +213,13 @@ export default function SharedForm({ role, onSubmit }) {
 
       if (Array.isArray(val)) {
         if (field === "hobbies") {
-          return val.some((h) => (h || "").trim() === "") || val.length === 0;
+          // Check if all hobby fields are filled and confirmed
+          return val.some((h, index) => {
+            const hobby = (h || "").trim();
+            if (hobby === "") return true; // Empty field
+            // Check if hobby is confirmed (either from suggestions or explicitly kept)
+            return !confirmedHobbies.has(index);
+          }) || val.length === 0;
         }
 
         if (field === "musicalArtists") {
@@ -300,6 +399,99 @@ export default function SharedForm({ role, onSubmit }) {
       console.log("🧪 Test search for 'Netflix':", testSearch);
     }
   }, [hobbiesList]);
+
+  // Set up periodic refresh of hobbies list (every 5 minutes)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const timeSinceLastRefresh = Date.now() - lastHobbiesRefresh;
+      const fiveMinutes = 5 * 60 * 1000; // 5 minutes in milliseconds
+      
+      if (timeSinceLastRefresh >= fiveMinutes) {
+        console.log("⏰ Periodic refresh triggered - refreshing hobbies list...");
+        refreshHobbiesList();
+      }
+    }, 60000); // Check every minute
+    
+    setHobbiesRefreshInterval(interval);
+    
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [lastHobbiesRefresh]);
+
+  // Set up periodic refresh of traits list (every 5 minutes)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const timeSinceLastRefresh = Date.now() - lastTraitsRefresh;
+      const fiveMinutes = 5 * 60 * 1000; // 5 minutes in milliseconds
+      
+      if (timeSinceLastRefresh >= fiveMinutes) {
+        console.log("⏰ Periodic refresh triggered - refreshing traits list...");
+        refreshTraitsList();
+      }
+    }, 60000); // Check every minute
+    
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [lastTraitsRefresh]);
+
+  // Smart refresh when form becomes visible (using Page Visibility API)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        const timeSinceLastRefresh = Date.now() - lastHobbiesRefresh;
+        const twoMinutes = 2 * 60 * 1000; // 2 minutes in milliseconds
+        
+        if (timeSinceLastRefresh >= twoMinutes) {
+          console.log("👁️ Form became visible - refreshing hobbies list...");
+          refreshHobbiesList();
+        }
+        
+        const timeSinceLastTraitsRefresh = Date.now() - lastTraitsRefresh;
+        if (timeSinceLastTraitsRefresh >= twoMinutes) {
+          console.log("👁️ Form became visible - refreshing traits list...");
+          refreshTraitsList();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [lastHobbiesRefresh, lastTraitsRefresh]);
+
+  // Refresh hobbies when navigating to step 2 (hobbies step)
+  useEffect(() => {
+    if (step === 2) {
+      const timeSinceLastRefresh = Date.now() - lastHobbiesRefresh;
+      const thirtySeconds = 30 * 1000; // 30 seconds in milliseconds
+      
+      if (timeSinceLastRefresh >= thirtySeconds) {
+        console.log("🎯 Navigated to hobbies step - refreshing hobbies list...");
+        refreshHobbiesList();
+      }
+    }
+  }, [step, lastHobbiesRefresh]);
+
+  // Refresh traits when navigating to step 7 (personality traits step)
+  useEffect(() => {
+    if (step === 7) {
+      const timeSinceLastRefresh = Date.now() - lastTraitsRefresh;
+      const thirtySeconds = 30 * 1000; // 30 seconds in milliseconds
+      
+      if (timeSinceLastRefresh >= thirtySeconds) {
+        console.log("🎯 Navigated to traits step - refreshing traits list...");
+        refreshTraitsList();
+      }
+    }
+  }, [step, lastTraitsRefresh]);
 
   const selectSpotifyResult = (index, item) => {
     console.log(`Selected item:`, item);
@@ -546,6 +738,15 @@ export default function SharedForm({ role, onSubmit }) {
         setHobbyVectors(vectors);
         setHobbiesList(updatedHobbies);
         console.log("✅ Reloaded hobbies list after adding new ones:", updatedHobbies.length);
+        
+        // Also refresh traits list to ensure consistency
+        try {
+          const traitsResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL || "https://nsbe-mentor-project.onrender.com"}/api/traits`);
+          const updatedTraits = await traitsResponse.json();
+          console.log("✅ Reloaded traits list after hobby submission:", updatedTraits.length);
+        } catch (err) {
+          console.log("⚠️ Could not refresh traits list:", err);
+        }
       }
 
       // Step 2: Vectorize unknown personality traits
@@ -671,6 +872,13 @@ export default function SharedForm({ role, onSubmit }) {
     hobbies[index] = value;
     setFormData((prev) => ({ ...prev, hobbies }));
 
+    // Reset confirmed status when user starts typing
+    setConfirmedHobbies(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(index);
+      return newSet;
+    });
+
     if (value.trim()) {
       const results = hobbyFuse ? hobbyFuse.search(value.trim()).map((r) => r.item) : [];
       setHobbySuggestions(results);
@@ -795,6 +1003,8 @@ export default function SharedForm({ role, onSubmit }) {
     setFormData((prev) => ({ ...prev, hobbies }));
     setHobbySuggestions([]);
     setActiveHobbyIndex(null);
+    // Mark this hobby as confirmed
+    setConfirmedHobbies(prev => new Set([...prev, index]));
   };
 
   const handleSelectMajor = (selectedMajor) => {
@@ -917,6 +1127,7 @@ export default function SharedForm({ role, onSubmit }) {
         <div className="space-y-4">
           <div className="flex gap-4">
             <input
+              type="text"
               name="firstName"
               value={formData.firstName}
               onChange={handleChange}
@@ -924,6 +1135,7 @@ export default function SharedForm({ role, onSubmit }) {
               className={`w-full border px-3 sm:px-4 py-2 sm:py-3 rounded text-sm sm:text-base ${errors.includes("firstName") ? "border-red-500" : ""}`}
             />
             <input
+              type="text"
               name="lastName"
               value={formData.lastName}
               onChange={handleChange}
@@ -961,6 +1173,7 @@ export default function SharedForm({ role, onSubmit }) {
 
           <div className="relative">
             <input
+              type="text"
               name="major"
               value={formData.major}
               onChange={handleChange}
@@ -1051,7 +1264,39 @@ export default function SharedForm({ role, onSubmit }) {
       )}
       {step === 2 && (
         <div className="space-y-4">
-          <h3 className="text-xl font-semibold text-gray-800">Hobbies</h3>
+          {/* New Hobbies Notification */}
+          {newHobbiesDiscovered.length > 0 && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-green-800 font-medium">
+                    {newHobbiesDiscovered.length} new hobby{newHobbiesDiscovered.length > 1 ? 'ies' : 'y'} discovered!
+                  </span>
+                </div>
+                <button
+                  onClick={() => setNewHobbiesDiscovered([])}
+                  className="text-green-600 hover:text-green-800"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <p className="text-green-700 text-sm mt-1">
+                New hobbies: {newHobbiesDiscovered.join(', ')}
+              </p>
+            </div>
+          )}
+          
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-semibold text-gray-800">Hobbies</h3>
+            <span className={`text-xs ${isRefreshing ? 'text-blue-500' : 'text-gray-500'}`}>
+              {isRefreshing ? 'Updating...' : `Updated: ${new Date(lastHobbiesRefresh).toLocaleTimeString()}`}
+            </span>
+          </div>
           <p className="font-medium text-base text-violet-500 text-center">
             What do you do when classes aren't beating you down?
           </p>
@@ -1061,6 +1306,7 @@ export default function SharedForm({ role, onSubmit }) {
               <div key={index} className="relative">
                 <div className="flex items-center gap-2">
                   <input
+                    type="text"
                     value={hobbyObj || ""}
                     onChange={(e) => handleHobbyChange(index, e.target.value)}
                     placeholder="Enter Hobbies"
@@ -1077,6 +1323,14 @@ export default function SharedForm({ role, onSubmit }) {
                         setHobbySuggestions(results);
                         setActiveHobbyIndex(index);
                         setFocusedHobbyOption(-1);
+                      }
+                      
+                      // Smart refresh when focusing on hobby input (if it's been a while)
+                      const timeSinceLastRefresh = Date.now() - lastHobbiesRefresh;
+                      const oneMinute = 60 * 1000; // 1 minute in milliseconds
+                      if (timeSinceLastRefresh >= oneMinute) {
+                        console.log("🎯 Hobby input focused - refreshing hobbies list...");
+                        refreshHobbiesList();
                       }
                     }}
                     onKeyDown={(e) => {
@@ -1147,13 +1401,14 @@ export default function SharedForm({ role, onSubmit }) {
                       ) && (
                           <li
                             onClick={() => {
-                              handleHobbyChange(index, hobbyObj || "");
+                              // Mark this custom hobby as confirmed
+                              setConfirmedHobbies(prev => new Set([...prev, index]));
                               setHobbySuggestions([]);
                               setActiveHobbyIndex(null);
                             }}
                             className="px-4 py-2 text-sm text-gray-500 hover:bg-gray-50 cursor-pointer italic"
                           >
-                            Keep “{hobbyObj || ""}”
+                            Keep "{hobbyObj || ""}"
                           </li>
                         )}
                     </ul>
@@ -1255,6 +1510,7 @@ export default function SharedForm({ role, onSubmit }) {
                       </div>
                     ) : (
                       <input
+                        type="text"
                         value={artist}
                         onChange={(e) =>
                           handleArtistChange(index, e.target.value)
@@ -1418,12 +1674,14 @@ export default function SharedForm({ role, onSubmit }) {
               <div key={index} className="flex items-start gap-2 relative">
                 <div className="relative w-full">
                   <input
+                    type="text"
                     value={org}
                     onChange={(e) =>
                       handleOrgInputChange(index, e.target.value)
                     }
                     placeholder="NSBE, Men's Club Soccer, etc."
-                    className={`w-full border px-4 py-2 rounded pr-10 ${errors.includes("organizations") &&
+                    className={`
+                      w-full border px-4 py-2 rounded pr-10 ${errors.includes("organizations") &&
                         (!org || org.trim() === "")
                         ? "border-red-500"
                         : ""
@@ -1541,9 +1799,41 @@ export default function SharedForm({ role, onSubmit }) {
       
       {step === 7 && (
         <div className="space-y-4">
-          <h3 className="text-xl font-semibold text-gray-800">
-            Last minute things...
-          </h3>
+          {/* New Traits Notification */}
+          {newTraitsDiscovered.length > 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-blue-800 font-medium">
+                    {newTraitsDiscovered.length} new trait{newTraitsDiscovered.length > 1 ? 's' : ''} discovered!
+                  </span>
+                </div>
+                <button
+                  onClick={() => setNewTraitsDiscovered([])}
+                  className="text-blue-600 hover:text-blue-800"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <p className="text-blue-700 text-sm mt-1">
+                New traits: {newTraitsDiscovered.join(', ')}
+              </p>
+            </div>
+          )}
+          
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-semibold text-gray-800">
+              Last minute things...
+            </h3>
+            <span className={`text-xs ${isRefreshingTraits ? 'text-blue-500' : 'text-gray-500'}`}>
+              {isRefreshingTraits ? 'Updating...' : `Updated: ${new Date(lastTraitsRefresh).toLocaleTimeString()}`}
+            </span>
+          </div>
           <p className="font-medium text-base text-violet-500 text-center">
             Who are you in three words? (e.g., "Curious, Driven, Friendly")
           </p>
@@ -1553,6 +1843,7 @@ export default function SharedForm({ role, onSubmit }) {
               <div key={index} className="relative">
                 <div className="flex items-center gap-2">
                   <input
+                    type="text"
                     value={traitObj?.raw || ""}
                     onChange={(e) => handleTraitChange(index, e.target.value)}
                     placeholder="Enter Trait"
@@ -1562,17 +1853,25 @@ export default function SharedForm({ role, onSubmit }) {
                         : ""
                       }`}
                     onFocus={() => {
-  const value = traitObj?.raw?.trim() || "";
-  if (value && value.length >= 2 && traitFuse?.search) {
-    const results = traitFuse.search(value).map((r) => r.item);
-    // Only update if results are different or field changed to prevent duplicates
-    if (JSON.stringify(results) !== JSON.stringify(traitSuggestions) || activeTraitIndex !== index) {
-      setTraitSuggestions(results);
-      setActiveTraitIndex(index);
-      setFocusedTraitOption(-1);
-    }
-  }
-}}
+                      const value = traitObj?.raw?.trim() || "";
+                      if (value && value.length >= 2 && traitFuse?.search) {
+                        const results = traitFuse.search(value).map((r) => r.item);
+                        // Only update if results are different or field changed to prevent duplicates
+                        if (JSON.stringify(results) !== JSON.stringify(traitSuggestions) || activeTraitIndex !== index) {
+                          setTraitSuggestions(results);
+                          setActiveTraitIndex(index);
+                          setFocusedTraitOption(-1);
+                        }
+                      }
+                      
+                      // Smart refresh when focusing on trait input (if it's been a while)
+                      const timeSinceLastRefresh = Date.now() - lastTraitsRefresh;
+                      const oneMinute = 60 * 1000; // 1 minute in milliseconds
+                      if (timeSinceLastRefresh >= oneMinute) {
+                        console.log("🎯 Trait input focused - refreshing traits list...");
+                        refreshTraitsList();
+                      }
+                    }}
                     onBlur={() => {
                       if (traitClickInProgress) {
                         setTraitClickInProgress(false);
@@ -1667,7 +1966,7 @@ export default function SharedForm({ role, onSubmit }) {
                             }}
                             className="px-4 py-2 text-sm text-gray-500 hover:bg-gray-50 cursor-pointer italic"
                           >
-                            Keep “{toTitleCase(traitObj?.raw || "")}”
+                            Keep "{toTitleCase(traitObj?.raw || "")}"
                           </li>
                         )}
                     </ul>
@@ -1688,33 +1987,31 @@ export default function SharedForm({ role, onSubmit }) {
           </div>
 
           <div className="pt-4 border-t border-gray-200">
-          <p className="font-medium text-base text-violet-500 text-center">
-            {role === "mentor"
-              ? `Describe your ideal mentee in a few words.`
-              : `Describe your ideal mentor in a few words.`}
-          </p>
-          <div className="relative">
-            <textarea
-              name="idealMatchDescription"
-              value={formData.idealMatchDescription}
-              onChange={handleChange}
-              placeholder="My twin 🤪"
-              className={`w-full border px-3 sm:px-4 py-2 sm:py-3 rounded mt-4 pr-16 sm:pr-20 text-sm sm:text-base ${errors.includes("idealMatchDescription") ? "border-red-500" : ""
-                }`}
-              rows="3"
-              maxLength="250"
-            />
-            <div className={`absolute bottom-2 right-2 text-sm pointer-events-none ${
-              formData.idealMatchDescription.length > 225 ? 'text-red-500' : 
-              formData.idealMatchDescription.length > 200 ? 'text-yellow-500' : 
-              'text-gray-500'
-            }`}>
-              {formData.idealMatchDescription.length}/250
+            <p className="font-medium text-base text-violet-500 text-center">
+              {role === "mentor"
+                ? `Describe your ideal mentee in a few words.`
+                : `Describe your ideal mentor in a few words.`}
+            </p>
+            <div className="relative">
+              <textarea
+                name="idealMatchDescription"
+                value={formData.idealMatchDescription}
+                onChange={handleChange}
+                placeholder="My twin 🤪"
+                className={`w-full border px-3 sm:px-4 py-2 sm:py-3 rounded mt-4 pr-16 sm:pr-20 text-sm sm:text-base ${errors.includes("idealMatchDescription") ? "border-red-500" : ""
+                  }`}
+                rows="3"
+                maxLength="250"
+              />
+              <div className={`absolute bottom-2 right-2 text-sm pointer-events-none ${
+                formData.idealMatchDescription.length > 225 ? 'text-red-500' : 
+                formData.idealMatchDescription.length > 200 ? 'text-yellow-500' : 
+                'text-gray-500'
+              }`}>
+                {formData.idealMatchDescription.length}/250
+              </div>
             </div>
           </div>
-          </div>
-
-
         </div>
       )}
       
@@ -1730,6 +2027,7 @@ export default function SharedForm({ role, onSubmit }) {
           <div className="space-y-4">
             <div className="max-w-md mx-auto">
               <input
+                type="text"
                 name="preferredStudentId"
                 value={formData.preferredStudentId}
                 onChange={handleChange}
@@ -1829,6 +2127,4 @@ export default function SharedForm({ role, onSubmit }) {
     </form>
     </>
   );
-  
 }
-
