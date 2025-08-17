@@ -100,6 +100,7 @@ export default function SharedForm({ role, onSubmit }) {
       setIsRefreshing(false);
     }
   };
+  
 
   // Function to refresh traits list and vectors
   const refreshTraitsList = async () => {
@@ -1031,26 +1032,41 @@ export default function SharedForm({ role, onSubmit }) {
   };
 
   // NSBE Logo Loading Component
-  const NSBELoadingOverlay = () => (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white p-8 rounded-lg shadow-lg text-center">
-        <div className="mb-4">
-          <img 
-            src="/pictures/nsbelogo.png" 
-            alt="NSBE Logo" 
-            className="w-24 h-24 mx-auto animate-pulse"
-          />
+  const NSBELoadingOverlay = () => {
+    const quotes = [
+      `"Patience young one" - Mus 2025`,
+      `9+10 = ?`,
+      `How many hours are in a day?`,
+      `How much wood could a woodchuck chuck if a woodchuck could chuck wood?`,
+    ];
+    const [quote, setQuote] = useState("");
+
+    useEffect(() => {
+      const randomIndex = Math.floor(Math.random() * quotes.length);
+      setQuote(quotes[randomIndex]);
+    }, []);
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white p-8 rounded-lg shadow-lg text-center">
+          <div className="mb-4">
+            <img 
+              src="/pictures/nsbelogo.png" 
+              alt="NSBE Logo" 
+              className="w-24 h-24 mx-auto animate-pulse"
+            />
+          </div>
+          <div className="flex items-center justify-center space-x-2">
+            <div className="w-3 h-3 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+            <div className="w-3 h-3 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+            <div className="w-3 h-3 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+          </div>
+          <p className="mt-4 text-gray-700 font-medium">Processing your application...</p>
+          <p className="text-sm text-gray-500">{quote}</p>
         </div>
-        <div className="flex items-center justify-center space-x-2">
-          <div className="w-3 h-3 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
-          <div className="w-3 h-3 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
-          <div className="w-3 h-3 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
-        </div>
-        <p className="mt-4 text-gray-700 font-medium">Processing your application...</p>
-        <p className="text-sm text-gray-500">"Patience young one" - Mus 2025</p>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <>
