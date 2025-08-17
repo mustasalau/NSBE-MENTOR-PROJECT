@@ -60,10 +60,8 @@ export default function SharedForm({ role, onSubmit }) {
   const [confirmedHobbies, setConfirmedHobbies] = useState(new Set()); // Track which hobbies have been confirmed
   const [lastHobbiesRefresh, setLastHobbiesRefresh] = useState(Date.now());
   const [hobbiesRefreshInterval, setHobbiesRefreshInterval] = useState(null);
-  const [newHobbiesDiscovered, setNewHobbiesDiscovered] = useState([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastTraitsRefresh, setLastTraitsRefresh] = useState(Date.now());
-  const [newTraitsDiscovered, setNewTraitsDiscovered] = useState([]);
   const [isRefreshingTraits, setIsRefreshingTraits] = useState(false);
   const progressPercent = Math.round(((step - 1) / 8) * 100);
   const [showConfetti, setShowConfetti] = useState(false);
@@ -88,19 +86,7 @@ export default function SharedForm({ role, onSubmit }) {
       const vectors = vectorsResponse.data;
       const updatedHobbies = hobbiesResponse.data;
       
-      // Detect new hobbies that weren't in the previous list
-      const previousHobbies = new Set(hobbiesList);
-      const newHobbies = updatedHobbies.filter(hobby => !previousHobbies.has(hobby));
-      
-      if (newHobbies.length > 0) {
-        console.log(`🎉 Discovered ${newHobbies.length} new hobbies:`, newHobbies);
-        setNewHobbiesDiscovered(newHobbies);
-        
-        // Auto-hide notification after 5 seconds
-        setTimeout(() => {
-          setNewHobbiesDiscovered([]);
-        }, 5000);
-      }
+
       
       setHobbyVectors(vectors);
       setHobbiesList(updatedHobbies);
@@ -131,19 +117,7 @@ export default function SharedForm({ role, onSubmit }) {
       const vectors = vectorsResponse.data;
       const updatedTraits = traitsResponse.data;
       
-      // Detect new traits that weren't in the previous list
-      const previousTraits = new Set(Object.keys(traitVectors));
-      const newTraits = updatedTraits.filter(trait => !previousTraits.has(trait));
-      
-      if (newTraits.length > 0) {
-        console.log(`🎉 Discovered ${newTraits.length} new traits:`, newTraits);
-        setNewTraitsDiscovered(newTraits);
-        
-        // Auto-hide notification after 5 seconds
-        setTimeout(() => {
-          setNewTraitsDiscovered([]);
-        }, 5000);
-      }
+
       
       setTraitVectors(vectors);
       setLastTraitsRefresh(Date.now());
@@ -1264,32 +1238,7 @@ export default function SharedForm({ role, onSubmit }) {
       )}
       {step === 2 && (
         <div className="space-y-4">
-          {/* New Hobbies Notification */}
-          {newHobbiesDiscovered.length > 0 && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span className="text-green-800 font-medium">
-                    {newHobbiesDiscovered.length} new hobby{newHobbiesDiscovered.length > 1 ? 'ies' : 'y'} discovered!
-                  </span>
-                </div>
-                <button
-                  onClick={() => setNewHobbiesDiscovered([])}
-                  className="text-green-600 hover:text-green-800"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              <p className="text-green-700 text-sm mt-1">
-                New hobbies: {newHobbiesDiscovered.join(', ')}
-              </p>
-            </div>
-          )}
+
           
           <div className="flex items-center justify-between">
             <h3 className="text-xl font-semibold text-gray-800">Hobbies</h3>
@@ -1799,32 +1748,7 @@ export default function SharedForm({ role, onSubmit }) {
       
       {step === 7 && (
         <div className="space-y-4">
-          {/* New Traits Notification */}
-          {newTraitsDiscovered.length > 0 && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span className="text-blue-800 font-medium">
-                    {newTraitsDiscovered.length} new trait{newTraitsDiscovered.length > 1 ? 's' : ''} discovered!
-                  </span>
-                </div>
-                <button
-                  onClick={() => setNewTraitsDiscovered([])}
-                  className="text-blue-600 hover:text-blue-800"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              <p className="text-blue-700 text-sm mt-1">
-                New traits: {newTraitsDiscovered.join(', ')}
-              </p>
-            </div>
-          )}
+
           
           <div className="flex items-center justify-between">
             <h3 className="text-xl font-semibold text-gray-800">
