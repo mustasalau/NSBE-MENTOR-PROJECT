@@ -146,3 +146,8 @@ jobs:
           echo "🧪 Testing majors scraper..."
           cd Scraper
           timeout 300s python3 majorScraper.py || echo "⚠️ Majors scraper test completed"
+          cd ..
+          echo "🧪 Merging scraped majors for verification..."
+          npm run update-majors-only || echo "⚠️ Merge simulation completed"
+          echo "📄 Majors sample after merge:"
+          head -n 30 src/data/majors.json | cat

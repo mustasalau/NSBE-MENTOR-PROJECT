@@ -89,7 +89,10 @@ jobs:
             npm run update-majors-only
           else
             echo "📚🎓 Updating both clubs and majors..."
-            npm run update-data
+            npm run scrape-majors
+            npm run update-majors-only
+            npm run scrape-clubs
+            npm run update-clubs-only
           fi
           
       - name: 📊 Check for changes
