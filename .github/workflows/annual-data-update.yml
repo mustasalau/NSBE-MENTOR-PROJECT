@@ -116,7 +116,7 @@ jobs:
           git config --local user.name "GitHub Action Bot"
           
           # Add only the data files and backups
-          git add src/data/clubs.json src/data/majors.json
+          git add src/data/clubs.json src/data/majors.json backend/hobby-backend/data/majors.json
           git add src/data/*backup*.json 2>/dev/null || true
           
           # Create commit message with details

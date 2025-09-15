@@ -12,6 +12,7 @@ function updateMajorsData() {
   
   const scraperOutputPath = path.join(rootDir, 'Scraper', 'penn_state_majors.json');
   const majorsJsonPath = path.join(rootDir, 'src', 'data', 'majors.json');
+  const backendMajorsPath = path.join(rootDir, 'backend', 'hobby-backend', 'data', 'majors.json');
 
   console.log('🎓 Starting majors data update...');
   console.log(`📂 Scraper output: ${scraperOutputPath}`);
@@ -86,6 +87,18 @@ function updateMajorsData() {
   }
 
   fs.writeFileSync(majorsJsonPath, JSON.stringify(mergedMajors, null, 2));
+
+  // Mirror to backend data folder for runtime usage without postinstall dependency
+  try {
+    const backendDir = path.dirname(backendMajorsPath);
+    if (!fs.existsSync(backendDir)) {
+      fs.mkdirSync(backendDir, { recursive: true });
+    }
+    fs.writeFileSync(backendMajorsPath, JSON.stringify(mergedMajors, null, 2));
+    console.log(`↪️  Mirrored majors to backend: ${backendMajorsPath}`);
+  } catch (mirrorErr) {
+    console.warn(`⚠️  Could not mirror majors to backend: ${mirrorErr.message}`);
+  }
 
   // Step 7: Create backup with timestamp
   const timestamp = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
