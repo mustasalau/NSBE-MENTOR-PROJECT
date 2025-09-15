@@ -21,6 +21,8 @@ on:
 env:
   # Ensure we're in production mode for path handling
   NODE_ENV: production
+  GOOGLE_CHROME_BIN: /usr/bin/chromium-browser
+  CHROME_PATH: /usr/bin/chromium-browser
 
 jobs:
   update-data:

@@ -14,6 +14,9 @@ on:
 jobs:
   test-scrapers:
     runs-on: ubuntu-latest
+    env:
+      GOOGLE_CHROME_BIN: /usr/bin/chromium-browser
+      CHROME_PATH: /usr/bin/chromium-browser
     
     steps:
       - name: 📥 Checkout repository
