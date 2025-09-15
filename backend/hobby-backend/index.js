@@ -2364,8 +2364,19 @@ app.get('/api/test/trait-vectors', async (req, res) => {
   try {
     debugLog('\n=== TRAIT VECTOR COMPARISON TEST ===\n');
     
-    // 1. Load static traits list
-    const staticTraits = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "..", "src", "data", "traits.json")));
+    // 1. Load static traits list using previously resolved path if available
+    let staticTraits = [];
+    try {
+      if (actualTraitsPath) {
+        staticTraits = JSON.parse(fs.readFileSync(actualTraitsPath, 'utf8'));
+      } else {
+        // Fallback to the correct two-level-up path
+        staticTraits = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "src", "data", "traits.json"), 'utf8'));
+      }
+    } catch (e) {
+      debugLog(`⚠️ Unable to read traits.json for test route: ${e.message}`);
+      staticTraits = [];
+    }
     debugLog(`📋 Static traits count: ${staticTraits.length}`);
     debugLog(`📋 First 5 static traits:`, staticTraits.slice(0, 5));
     

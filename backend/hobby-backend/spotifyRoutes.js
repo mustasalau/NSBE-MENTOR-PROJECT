@@ -11,6 +11,15 @@ let token = "";
 
 // Genre cache to reduce API calls and provide fallbacks
 const genreCache = new Map();
+// Track in-flight requests to coalesce concurrent fetches per artist
+const inFlightGenreRequests = new Map();
+
+// Jittered exponential backoff helper (in ms)
+function backoffWithJitter(attempt, baseMs = 500, maxMs = 4000) {
+  const exp = Math.min(maxMs, baseMs * Math.pow(2, attempt - 1));
+  const jitter = Math.random() * (exp * 0.2); // +/-20%
+  return Math.floor(exp - jitter);
+}
 
 // Comprehensive genre mappings for popular artists (fallback when API fails)
 // CRITICAL: These ensure matching algorithm works even when Spotify API fails
@@ -142,88 +151,101 @@ async function fetchArtistGenres(artistId, artistName = null) {
     return genreCache.get(artistId);
   }
 
-  const maxRetries = 3;
-  let lastError;
+  // Coalesce concurrent requests for same artist
+  if (inFlightGenreRequests.has(artistId)) {
+    return inFlightGenreRequests.get(artistId);
+  }
 
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      // Add timeout to prevent hanging requests
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+  const promise = (async () => {
+    const maxRetries = 4;
+    let lastError;
 
-      const resp = await fetch(`https://api.spotify.com/v1/artists/${artistId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: controller.signal,
-        catch (err) {
-          console.error('Network error:', err.message);
-        }
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Ensure we have a token before the first attempt
+        if (!token) await getToken();
 
-      });
+        // Add timeout to prevent hanging requests
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 7000); // 7 second timeout
 
-      clearTimeout(timeoutId);
+        const resp = await fetch(`https://api.spotify.com/v1/artists/${artistId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
+        });
 
-      if (!resp.ok) {
-        if (resp.status === 401) {
-          // Token might be expired, refresh and retry
-          await getToken();
-          continue;
-        }
-        if (resp.status === 429) {
-          // Rate limited - wait and retry
-          const retryAfter = resp.headers.get('retry-after') || 1;
-          console.warn(`Rate limited for artist ${artistId}, waiting ${retryAfter}s...`);
-          await new Promise(resolve => setTimeout(resolve, parseInt(retryAfter) * 1000));
-          continue;
-        }
-        if (resp.status === 404) {
-          // Artist not found - this is final, don't retry
-          console.warn(`Artist not found: ${artistId}`);
+        clearTimeout(timeoutId);
+
+        if (!resp.ok) {
+          if (resp.status === 401) {
+            // Token expired/invalid: refresh and retry
+            await getToken();
+            continue;
+          }
+          if (resp.status === 429) {
+            // Rate limited - wait and retry
+            const retryAfter = parseInt(resp.headers.get('retry-after') || '1', 10);
+            const waitMs = Math.max(1000, retryAfter * 1000);
+            console.warn(`Rate limited for artist ${artistId}, waiting ${retryAfter}s...`);
+            await new Promise(resolve => setTimeout(resolve, waitMs));
+            continue;
+          }
+          if (resp.status === 404) {
+            console.warn(`Artist not found: ${artistId}`);
+            return [];
+          }
+          if (resp.status >= 500 && resp.status < 600) {
+            // Retry on server errors
+            const waitMs = backoffWithJitter(attempt);
+            console.warn(`HTTP ${resp.status} for artist ${artistId}; retrying in ${waitMs}ms`);
+            await new Promise(resolve => setTimeout(resolve, waitMs));
+            continue;
+          }
+          console.warn(`HTTP ${resp.status} for artist ${artistId}`);
           return [];
         }
-        console.warn(`HTTP ${resp.status} for artist ${artistId}`);
-        return [];
-      }
 
-      const data = await resp.json();
-      const genres = data.genres || [];
-      
-      // Cache the successful result
-      if (genres.length > 0) {
-        genreCache.set(artistId, genres);
-      }
-      
-      return genres;
+        const data = await resp.json();
+        const genres = data.genres || [];
+        
+        if (genres.length > 0) {
+          genreCache.set(artistId, genres);
+        }
+        
+        return genres;
 
-    } catch (err) {
-      lastError = err;
-      
-      if (err.name === 'AbortError') {
-        console.warn(`Timeout fetching genres for artist ${artistId} (attempt ${attempt}/${maxRetries})`);
-      } else {
-        console.warn(`Network error fetching genres for artist ${artistId} (attempt ${attempt}/${maxRetries}): ${err.message}`);
-      }
-      
-      // If this is the last attempt, don't wait
-      if (attempt < maxRetries) {
-        // Wait briefly before retrying
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Progressive backoff
+      } catch (err) {
+        lastError = err;
+        if (err.name === 'AbortError') {
+          console.warn(`Timeout fetching genres for artist ${artistId} (attempt ${attempt}/${maxRetries})`);
+        } else {
+          console.warn(`Network error fetching genres for artist ${artistId} (attempt ${attempt}/${maxRetries}): ${err.message}`);
+        }
+        if (attempt < maxRetries) {
+          const waitMs = backoffWithJitter(attempt);
+          await new Promise(resolve => setTimeout(resolve, waitMs));
+        }
       }
     }
-  }
 
-  // All retries failed - use fallback genres
-  console.warn(`All attempts failed for artist ${artistId}. Last error:`, lastError?.message || 'Unknown error');
-  const fallbackGenres = getFallbackGenres(artistName);
-  
-  if (fallbackGenres.length > 0) {
-    console.log(`Using fallback genres for ${artistName}: ${fallbackGenres.join(', ')}`);
-    // Cache the fallback so we don't retry
-    genreCache.set(artistId, fallbackGenres);
-    return fallbackGenres;
+    console.warn(`All attempts failed for artist ${artistId}. Last error:`, lastError?.message || 'Unknown error');
+    const fallbackGenres = getFallbackGenres(artistName);
+    if (fallbackGenres.length > 0) {
+      console.log(`Using fallback genres for ${artistName}: ${fallbackGenres.join(', ')}`);
+      genreCache.set(artistId, fallbackGenres);
+      return fallbackGenres;
+    }
+    console.warn(`No fallback genres available for ${artistName || 'unknown artist'}`);
+    return [];
+  })();
+
+  inFlightGenreRequests.set(artistId, promise);
+  try {
+    const result = await promise;
+    return result;
+  } finally {
+    inFlightGenreRequests.delete(artistId);
   }
-  
-  console.warn(`No fallback genres available for ${artistName || 'unknown artist'}`);
-  return [];
 }
 
 // Search Route
@@ -234,9 +256,6 @@ router.get("/search", async (req, res) => {
   const fetchSpotify = () =>
     fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track,album,artist&limit=5`, {
       headers: { Authorization: `Bearer ${token}` },
-      catch (err) {
-        console.error('Network error:', err.message);
-      }
     });
 
   try {
@@ -244,6 +263,11 @@ router.get("/search", async (req, res) => {
     let resp = await fetchSpotify();
     if (resp.status === 401) {
       await getToken();
+      resp = await fetchSpotify();
+    }
+    if (resp.status === 429) {
+      const retryAfter = parseInt(resp.headers.get('retry-after') || '1', 10);
+      await new Promise(resolve => setTimeout(resolve, Math.max(1000, retryAfter * 1000)));
       resp = await fetchSpotify();
     }
     if (!resp.ok) return res.status(500).json({ error: "Spotify API failed" });

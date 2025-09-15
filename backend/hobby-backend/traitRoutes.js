@@ -20,13 +20,36 @@ const __dirname = path.dirname(__filename);
 // Paths
 const traitVectorPath = path.join(__dirname, "openAI_trait_vectors.json");
 let traitVectors = loadVectors(traitVectorPath);
-const traitsPath = path.join(__dirname, "..", "..", "..", "src", "data", "traits.json");
+
+// Resolve traits.json robustly across environments
+function resolveTraitsPath() {
+  const candidates = [
+    // 1) Copied during postinstall
+    path.join(__dirname, "data", "traits.json"),
+    // 2) Project src/data from backend dir (two ..)
+    path.join(__dirname, "..", "..", "src", "data", "traits.json"),
+    // 3) From CWD typical root
+    path.join(process.cwd(), "src", "data", "traits.json"),
+    // 4) Flat data in CWD
+    path.join(process.cwd(), "data", "traits.json"),
+  ];
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p)) return p;
+    } catch {}
+  }
+  // Default to backend local data path (ensure directory exists later)
+  return path.join(__dirname, "data", "traits.json");
+}
+
+const traitsPath = resolveTraitsPath();
 
 let staticTraits = [];
 try {
   staticTraits = JSON.parse(fs.readFileSync(traitsPath, "utf-8"));
 } catch {
-  console.warn(`No existing traits.json found. Starting fresh.`);
+  console.warn(`No existing traits.json found at ${traitsPath}. Starting fresh.`);
+  staticTraits = [];
 }
 
 // Routes
@@ -54,8 +77,13 @@ router.post("/add", async (req, res) => {
   if (!staticTraits.includes(titleCaseTrait)) {
     staticTraits.push(titleCaseTrait);
     staticTraits.sort();
+    // Ensure directory exists before writing
+    const dir = path.dirname(traitsPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
     fs.writeFileSync(traitsPath, JSON.stringify(staticTraits, null, 2));
-    debugLog(`✅ Added new trait to traits.json: "${titleCaseTrait}"`);
+    debugLog(`✅ Added new trait to traits.json at ${traitsPath}: "${titleCaseTrait}"`);
   }
 
   res.json({

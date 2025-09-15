@@ -68,6 +68,8 @@ export default function SharedForm({ role, onSubmit }) {
   const [showTitle, setShowTitle] = useState(false);
   const [showMessage, setShowMessage] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null); // { code, message }
+  const [retrySeconds, setRetrySeconds] = useState(0);
   const BASE_URL = import.meta.env.VITE_BACKEND_URL || "https://nsbe-mentor-project.onrender.com";
 
   // Function to refresh hobbies list and vectors
@@ -665,12 +667,7 @@ export default function SharedForm({ role, onSubmit }) {
     setStep((prev) => prev - 1);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validateStep(step)) return;
-
-    setIsSubmitting(true);
-
+  const performSubmit = async () => {
     try {
       console.log("🚀 Starting vectorization and submission process...");
 
@@ -789,8 +786,18 @@ export default function SharedForm({ role, onSubmit }) {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to submit form");
+        let errorText = 'Failed to submit form';
+        try {
+          const errorData = await response.json();
+          if (errorData?.error) errorText = errorData.error;
+        } catch {}
+        const status = response.status;
+        if (status === 429) {
+          const ra = parseInt(response.headers.get('retry-after') || '10', 10);
+          setRetrySeconds(isNaN(ra) ? 10 : Math.max(5, ra));
+        }
+        setSubmitError({ code: status, message: errorText });
+        throw new Error(`${status}: ${errorText}`);
       }
 
       console.log("✅ Submission successful!");
@@ -837,9 +844,27 @@ export default function SharedForm({ role, onSubmit }) {
 
     } catch (err) {
       console.error("🚨 Submission error:", err);
-      alert(`Submission failed: ${err.message}`);
+      // Show overlay instead of alert; keep isSubmitting false to let user retry
       setIsSubmitting(false);
     }
+  };
+
+  // Countdown for 429 Retry-After
+  useEffect(() => {
+    if (submitError?.code === 429 && retrySeconds > 0) {
+      const timer = setInterval(() => {
+        setRetrySeconds((s) => (s > 0 ? s - 1 : 0));
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [submitError, retrySeconds]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!validateStep(step)) return;
+    setSubmitError(null);
+    setIsSubmitting(true);
+    await performSubmit();
   };
 
   const handleHobbyChange = (index, value) => {
@@ -1034,17 +1059,20 @@ export default function SharedForm({ role, onSubmit }) {
   // NSBE Logo Loading Component
   const NSBELoadingOverlay = () => {
     const quotes = [
-      `"Patience young one" - Mus 2025`,
       `9+10 = ?`,
+      `"Patience young one" - Mus 2025`,
       `How many hours are in a day?`,
       `How much wood could a woodchuck chuck if a woodchuck could chuck wood?`,
     ];
     const [quote, setQuote] = useState("");
 
     useEffect(() => {
-      const randomIndex = Math.floor(Math.random() * quotes.length);
-      setQuote(quotes[randomIndex]);
-    }, []);
+      const interval = setInterval(() => {
+        const randomIndex = Math.floor(Math.random() * quotes.length);
+        setQuote(quotes[randomIndex]);
+      }, 3000);
+      return () => clearInterval(interval); // cleanup when overlay unmounts
+  }, []);
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -1068,9 +1096,69 @@ export default function SharedForm({ role, onSubmit }) {
     );
   };
 
+  // Error Overlay for 500/429 with intuitive retry
+  const SubmitErrorOverlay = () => {
+    if (!submitError) return null;
+    const isRateLimited = submitError.code === 429;
+    const isServerError = submitError.code >= 500 && submitError.code < 600;
+    const headline = isRateLimited
+      ? 'Too many requests — please try again shortly'
+      : isServerError
+      ? 'Something went wrong on our end'
+      : 'Submission failed';
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white p-8 rounded-lg shadow-lg text-center max-w-sm w-11/12">
+          <div className="mb-4">
+            <img src="/pictures/nsbelogo.png" alt="NSBE Logo" className="w-24 h-24 mx-auto" />
+          </div>
+          <div className="flex items-center justify-center space-x-2 mb-3">
+            <div className="w-3 h-3 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+            <div className="w-3 h-3 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+            <div className="w-3 h-3 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+          </div>
+          <h3 className="text-xl font-bold text-gray-800 mb-2">{headline}</h3>
+          <p className="text-sm text-gray-700 mb-5">
+            {isRateLimited
+              ? `We’re receiving a lot of traffic. ${retrySeconds > 0 ? `Please wait ${retrySeconds}s` : 'You can retry now'}.`
+              : submitError.message || 'Please try again.'}
+          </p>
+          <div className="flex gap-3 justify-center">
+            <button
+              type="button"
+              className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400 text-sm"
+              onClick={() => setSubmitError(null)}
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              className={`px-4 py-2 rounded text-white text-sm ${
+                submitError.code === 429 && retrySeconds > 0
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-green-600 hover:bg-green-700'
+              }`}
+              disabled={submitError.code === 429 && retrySeconds > 0}
+              onClick={async () => {
+                setSubmitError(null);
+                setIsSubmitting(true);
+                await performSubmit();
+              }}
+            >
+              {submitError.code === 429 && retrySeconds > 0
+                ? `Retry in ${retrySeconds}s`
+                : 'Retry submission'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
       {isSubmitting && <NSBELoadingOverlay />}
+      <SubmitErrorOverlay />
       <form
         onSubmit={handleSubmit}
         className={`space-y-4 mx-auto ${step < 9 ? "bg-white p-4 sm:p-6 rounded shadow-lg max-w-lg" : ""}`}
