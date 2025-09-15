@@ -19,6 +19,21 @@ def create_driver():
     options.add_argument('--disable-dev-shm-usage')
     options.add_argument('--disable-gpu')
     options.add_argument('--window-size=1920,1080')
+    
+    # Resolve Chrome/Chromium binary path in CI and local
+    candidates = [
+        os.environ.get('CHROME_PATH'),
+        os.environ.get('GOOGLE_CHROME_BIN'),
+        '/usr/bin/google-chrome',
+        '/usr/bin/google-chrome-stable',
+        '/usr/bin/chromium-browser',
+        '/usr/bin/chromium',
+        '/opt/google/chrome/google-chrome',
+    ]
+    for cand in candidates:
+        if cand and os.path.exists(cand):
+            options.binary_location = cand
+            break
     # Let Selenium Manager resolve the proper driver
     return webdriver.Chrome(options=options)
 
